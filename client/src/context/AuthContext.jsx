@@ -81,6 +81,25 @@ export function AuthProvider({ children }) {
     clearAuth();
   };
 
+  const updateProfile = async (payload) => {
+    const data = await authService.updateProfile(payload);
+    const storedAuth = readStoredAuth();
+
+    if (storedAuth?.accessToken) {
+      persistAuth({
+        accessToken: storedAuth.accessToken,
+        refreshToken: storedAuth.refreshToken,
+        user: data.user || storedAuth.user,
+      });
+    }
+
+    return data;
+  };
+
+  const changePassword = async (payload) => {
+    return authService.changePassword(payload);
+  };
+
   const refreshToken = async () => {
     try {
       const storedAuth = readStoredAuth();
@@ -112,6 +131,8 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
+    updateProfile,
+    changePassword,
     refreshToken,
   };
 

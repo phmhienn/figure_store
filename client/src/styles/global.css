@@ -1121,6 +1121,12 @@ a {
   gap: 18px;
 }
 
+.profile-summary {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
 .summary-box div {
   display: grid;
   gap: 8px;

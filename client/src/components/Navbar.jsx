@@ -151,6 +151,9 @@ function Navbar() {
                   </div>
                 </div>
                 <div className="account-links">
+                  <NavLink to="/profile" className="account-link">
+                    Tài khoản
+                  </NavLink>
                   {(isAdmin || isStaff) && (
                     <NavLink to="/admin" className="account-link">
                       Quản trị

@@ -23,7 +23,7 @@ dotenv.config();
 
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
-const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+const clientUrl = process.env.CLIENT_URL || "http://localhost:5174";
 
 // Debug: log CORS config
 if (process.env.NODE_ENV !== "production") {
@@ -97,18 +97,18 @@ const createServer = (port, basePort = port) =>
 
 const getDatabaseErrorMessage = (error) => {
   if (error.code === "ER_ACCESS_DENIED_ERROR") {
-    return "Khong the dang nhap MySQL. Hay kiem tra DB_USER va DB_PASSWORD trong server/.env.";
+    return "Không thể đăng nhập MySQL. Hãy kiểm tra DB_USER và DB_PASSWORD trong server/.env.";
   }
 
   if (error.code === "ER_BAD_DB_ERROR") {
-    return "Database figure_shop chua ton tai. Hay mo database.sql bang MySQL Workbench va chay file nay truoc.";
+    return "Database figure_shop chưa tồn tại. Hãy mở database.sql bằng MySQL Workbench và chạy file này trước.";
   }
 
   if (error.code === "ECONNREFUSED") {
-    return "Khong ket noi duoc MySQL Server. Hay mo MySQL Workbench/XAMPP/MySQL Service va kiem tra DB_HOST, DB_PORT.";
+    return "Không kết nối được MySQL Server. Hãy mở MySQL Workbench/XAMPP/MySQL Service và kiểm tra DB_HOST, DB_PORT.";
   }
 
-  return `Loi ket noi MySQL: ${error.message}`;
+  return `Lỗi kết nối MySQL: ${error.message}`;
 };
 
 const bootstrap = async () => {

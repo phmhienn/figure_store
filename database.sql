@@ -245,6 +245,20 @@ CREATE TABLE refresh_tokens (
 );
 
 -- ============================================================
+-- Password reset tokens
+-- ============================================================
+
+CREATE TABLE password_reset_tokens (
+    token_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    token_hash VARCHAR(255) NOT NULL UNIQUE,
+    expires_at DATETIME NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- Indexes
 -- ============================================================
 
@@ -255,6 +269,7 @@ CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_reviews_product_id ON reviews(product_id);
 CREATE INDEX idx_product_images_product_id ON product_images(product_id);
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
 CREATE INDEX idx_news_slug ON news_posts(slug);
 CREATE INDEX idx_news_status ON news_posts(status);
 CREATE INDEX idx_news_created_at ON news_posts(created_at);

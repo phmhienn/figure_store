@@ -78,6 +78,100 @@ const validateLogin = (req, res, next) => {
   next();
 };
 
+const validateForgotPassword = (req, res, next) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required." });
+  }
+
+  if (!validateEmail(email)) {
+    return res.status(400).json({ message: "Invalid email format." });
+  }
+
+  next();
+};
+
+const validateResetPassword = (req, res, next) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ message: "Token and password are required." });
+  }
+
+  if (!validatePassword(password)) {
+    return res.status(400).json({
+      message:
+        "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
+    });
+  }
+
+  next();
+};
+
+const validateVerifyOtp = (req, res, next) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ message: "Email and OTP are required." });
+  }
+
+  if (!validateEmail(email)) {
+    return res.status(400).json({ message: "Invalid email format." });
+  }
+
+  if (!/^[0-9]{4,8}$/.test(String(otp))) {
+    return res.status(400).json({ message: "OTP format is invalid." });
+  }
+
+  next();
+};
+
+const validateUpdateProfile = (req, res, next) => {
+  const { username, email, full_name, phone } = req.body;
+
+  if (username && !validateUsername(username)) {
+    return res
+      .status(400)
+      .json({ message: "Tên đăng nhập phải gồm 3-30 ký tự chữ hoặc số." });
+  }
+
+  if (email && !validateEmail(email)) {
+    return res.status(400).json({ message: "Email không hợp lệ." });
+  }
+
+  if (phone && !validatePhone(phone)) {
+    return res.status(400).json({ message: "Số điện thoại không hợp lệ." });
+  }
+
+  if (full_name && (full_name.length < 2 || full_name.length > 100)) {
+    return res
+      .status(400)
+      .json({ message: "Họ và tên phải có độ dài 2-100 ký tự." });
+  }
+
+  next();
+};
+
+const validateChangePassword = (req, res, next) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({
+      message: "Mật khẩu hiện tại và mật khẩu mới là bắt buộc.",
+    });
+  }
+
+  if (!validatePassword(newPassword)) {
+    return res.status(400).json({
+      message:
+        "Mật khẩu mới phải ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.",
+    });
+  }
+
+  next();
+};
+
 const validateProductPayload = (req, res, next) => {
   const { name, price, stock_quantity } = req.body;
 
@@ -158,6 +252,11 @@ const validateNewsPayload = (req, res, next) => {
 module.exports = {
   validateRegister,
   validateLogin,
+  validateForgotPassword,
+  validateResetPassword,
+  validateVerifyOtp,
+  validateUpdateProfile,
+  validateChangePassword,
   validateProductPayload,
   validateNewsPayload,
   validateEmail,

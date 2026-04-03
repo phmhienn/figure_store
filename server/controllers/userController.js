@@ -3,7 +3,10 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 
 const userModel = require("../models/userModel");
+const addressModel = require("../models/addressModel");
+const passwordResetTokenModel = require("../models/passwordResetTokenModel");
 const refreshTokenModel = require("../models/refreshTokenModel");
+const { sendPasswordResetOtpEmail } = require("../services/emailService");
 const {
   validateEmail,
   validatePassword,
@@ -53,6 +56,27 @@ const createRefreshToken = (user) =>
 
 const hashToken = (token) =>
   crypto.createHash("sha256").update(token).digest("hex");
+
+const getOtpLength = () => {
+  const length = Number(process.env.PASSWORD_RESET_OTP_LENGTH || 6);
+  if (!Number.isFinite(length) || length < 4) return 6;
+  return Math.min(length, 8);
+};
+
+const getOtpTtlMs = () => {
+  const minutes = Number(process.env.PASSWORD_RESET_OTP_TTL_MINUTES || 10);
+  return minutes * 60 * 1000;
+};
+
+const getResetSessionTtlMs = () => {
+  const minutes = Number(process.env.PASSWORD_RESET_SESSION_TTL_MINUTES || 10);
+  return minutes * 60 * 1000;
+};
+
+const generateOtp = (length) => {
+  const max = 10 ** length;
+  return String(crypto.randomInt(0, max)).padStart(length, "0");
+};
 
 const sanitizeUser = (user) => ({
   user_id: user.user_id,
@@ -146,6 +170,104 @@ const login = async (req, res, next) => {
   }
 };
 
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const cleanEmail = String(email || "").trim();
+
+    const user = await userModel.findByEmail(cleanEmail);
+
+    if (!user) {
+      return res.json({
+        message: "If the email exists, an OTP has been sent.",
+      });
+    }
+
+    const otpLength = getOtpLength();
+    const otp = generateOtp(otpLength);
+    const tokenHash = hashToken(otp);
+
+    await passwordResetTokenModel.deleteAllForUser(user.user_id);
+    await passwordResetTokenModel.create({
+      user_id: user.user_id,
+      token_hash: tokenHash,
+      expires_at: new Date(Date.now() + getOtpTtlMs()),
+    });
+
+    await sendPasswordResetOtpEmail({
+      to: user.email,
+      otp,
+      ttlMinutes: Math.round(getOtpTtlMs() / 60000),
+    });
+
+    return res.json({
+      message: "If the email exists, an OTP has been sent.",
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const verifyPasswordOtp = async (req, res, next) => {
+  try {
+    const { email, otp } = req.body;
+    const cleanEmail = String(email || "").trim();
+    const cleanOtp = String(otp || "").trim();
+
+    const user = await userModel.findByEmail(cleanEmail);
+    if (!user) {
+      return res.status(400).json({ message: "OTP không hợp lệ." });
+    }
+
+    const tokenHash = hashToken(cleanOtp);
+    const storedToken = await passwordResetTokenModel.findByHash(tokenHash);
+
+    if (!storedToken || storedToken.user_id !== user.user_id) {
+      return res.status(400).json({ message: "OTP không hợp lệ." });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    await passwordResetTokenModel.deleteAllForUser(user.user_id);
+    await passwordResetTokenModel.create({
+      user_id: user.user_id,
+      token_hash: hashToken(resetToken),
+      expires_at: new Date(Date.now() + getResetSessionTtlMs()),
+    });
+
+    return res.json({ resetToken });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+    const tokenHash = hashToken(String(token || ""));
+
+    const storedToken = await passwordResetTokenModel.findByHash(tokenHash);
+
+    if (!storedToken) {
+      return res.status(400).json({ message: "Invalid or expired reset token." });
+    }
+
+    const user = await userModel.findById(storedToken.user_id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    const password_hash = await bcrypt.hash(password, 10);
+    await userModel.update(user.user_id, { password_hash });
+    await passwordResetTokenModel.deleteAllForUser(user.user_id);
+    await refreshTokenModel.deleteAllForUser(user.user_id);
+
+    return res.json({ message: "Password reset successful." });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const refreshAccessToken = async (req, res, next) => {
   try {
     const { refreshToken } = req.body;
@@ -221,6 +343,95 @@ const getCurrentUser = async (req, res, next) => {
     }
 
     return res.json(sanitizeUser(user));
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const updateCurrentUser = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { username, email, full_name, phone } = req.body;
+
+    if (!username && !email && !full_name && !phone) {
+      return res.status(400).json({ message: "Không có thay đổi nào." });
+    }
+
+    const existingUser = await userModel.findById(userId);
+    if (!existingUser) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng." });
+    }
+
+    if (username && username !== existingUser.username) {
+      const existingUsername = await userModel.findByUsername(username);
+      if (existingUsername) {
+        return res
+          .status(409)
+          .json({ message: "Tên đăng nhập đã tồn tại." });
+      }
+    }
+
+    if (email && email !== existingUser.email) {
+      const existingEmail = await userModel.findByEmail(email);
+      if (existingEmail) {
+        return res.status(409).json({ message: "Email đã tồn tại." });
+      }
+    }
+
+    const updatedUser = await userModel.update(userId, {
+      username,
+      email,
+      full_name,
+      phone,
+    });
+
+    return res.json({
+      message: "Cập nhật thông tin thành công.",
+      user: sanitizeUser(updatedUser),
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const getDefaultAddress = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const address = await addressModel.findDefaultByUserId(userId);
+    return res.json({ address });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+const changePassword = async (req, res, next) => {
+  try {
+    const userId = req.user.userId;
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy người dùng." });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
+    if (!isMatch) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu hiện tại không đúng." });
+    }
+
+    if (currentPassword === newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu mới phải khác mật khẩu hiện tại." });
+    }
+
+    const password_hash = await bcrypt.hash(newPassword, 10);
+    await userModel.update(userId, { password_hash });
+    await refreshTokenModel.deleteAllForUser(userId);
+
+    return res.json({ message: "Đổi mật khẩu thành công." });
   } catch (error) {
     return next(error);
   }
@@ -369,7 +580,13 @@ const deleteUser = async (req, res, next) => {
 module.exports = {
   register,
   login,
+  forgotPassword,
+  verifyPasswordOtp,
+  resetPassword,
   getCurrentUser,
+  updateCurrentUser,
+  getDefaultAddress,
+  changePassword,
   refreshAccessToken,
   logout,
   getAllUsers,

@@ -10,6 +10,7 @@ import AdminStaffPage from "./pages/AdminStaffPage";
 import CartPage from "./pages/CartPage";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import NewArrivalsPage from "./pages/NewArrivalsPage";
 import NewsDetailPage from "./pages/NewsDetailPage";
 import NewsPage from "./pages/NewsPage";
@@ -18,7 +19,9 @@ import ReadyStockPage from "./pages/ReadyStockPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import PreorderLookupPage from "./pages/PreorderLookupPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
+import ProfilePage from "./pages/ProfilePage";
 import RegisterPage from "./pages/RegisterPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ShippingWarrantyPage from "./pages/ShippingWarrantyPage";
 
 function App() {
@@ -39,6 +42,16 @@ function App() {
           <Route path="/ready-stock" element={<ReadyStockPage />} />
           <Route path="/preorder" element={<PreorderPage />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/register" element={<RegisterPage />} />
           <Route
             path="/admin"
