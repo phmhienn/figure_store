@@ -58,9 +58,13 @@ const hasCompletedOrder = async (userId, productId) => {
       FROM orders o
       JOIN order_items oi ON oi.order_id = o.order_id
       WHERE o.user_id = ? AND oi.product_id = ? AND o.status = 'completed'
+      UNION
+      SELECT 1
+      FROM preorders p
+      WHERE p.user_id = ? AND p.product_id = ? AND p.status = 'completed'
       LIMIT 1
     `,
-    [userId, productId],
+    [userId, productId, userId, productId],
   );
 
   return rows.length > 0;

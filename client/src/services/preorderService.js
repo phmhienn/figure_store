@@ -11,6 +11,10 @@ const preorderService = {
     });
     return data;
   },
+  getMine: async () => {
+    const { data } = await api.get("/preorders/my");
+    return data;
+  },
   getAll: async () => {
     const { data } = await api.get("/preorders/admin");
     return data;

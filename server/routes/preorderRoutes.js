@@ -8,7 +8,8 @@ const router = express.Router();
 
 router.post("/", protect, preorderController.createPreorder);
 router.get("/lookup", preorderController.lookupPreorder);
-router.get("/vnpay/ipn", preorderController.handleVnpayIpn);
+router.get("/my", protect, preorderController.getMyPreorders);
+router.post("/momo/ipn", preorderController.handleMomoIpn);
 
 router.get(
   "/admin",

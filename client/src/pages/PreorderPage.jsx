@@ -2,28 +2,21 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import ProductCard from "../components/ProductCard";
-import { useAuth } from "../context/AuthContext";
 import productService from "../services/productService";
-import preorderService from "../services/preorderService";
 import { formatCurrency } from "../utils/format";
 
 const DEPOSIT_RATIO = 0.2;
 
 function PreorderPage() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState({ type: "", text: "" });
-  const [submittingId, setSubmittingId] = useState(null);
 
   useEffect(() => {
     const fetchPreorders = async () => {
       setLoading(true);
       setError("");
-      setNotice({ type: "", text: "" });
-
       try {
         const result = await productService.getAll({ page: 1, limit: 48 });
         const preorderItems = (result.data || []).filter(
@@ -43,44 +36,8 @@ function PreorderPage() {
     fetchPreorders();
   }, []);
 
-  const handlePreorder = async (product) => {
-    if (!isAuthenticated) {
-      navigate("/login");
-      return;
-    }
-
-    setNotice({ type: "", text: "" });
-    setSubmittingId(product.product_id);
-
-    try {
-      const data = await preorderService.create({
-        product_id: product.product_id,
-        quantity: 1,
-      });
-
-      if (!data?.payUrl) {
-        setNotice({
-          type: "error",
-          text: "Không thể tạo link thanh toán VNPay.",
-        });
-        return;
-      }
-
-      setNotice({
-        type: "success",
-        text: "Đang chuyển đến cổng thanh toán VNPay...",
-      });
-      window.location.href = data.payUrl;
-    } catch (requestError) {
-      setNotice({
-        type: "error",
-        text:
-          requestError.response?.data?.message ||
-          "Không thể tạo đơn đặt trước.",
-      });
-    } finally {
-      setSubmittingId(null);
-    }
+  const handlePreorder = (product) => {
+    navigate(`/preorder/checkout/${product.product_id}`);
   };
 
   return (
@@ -118,17 +75,6 @@ function PreorderPage() {
           Đang tải danh sách sản phẩm...
         </section>
       )}
-      {notice.text && (
-        <section
-          className={
-            notice.type === "error"
-              ? "content-panel error-panel"
-              : "content-panel success-panel"
-          }
-        >
-          {notice.text}
-        </section>
-      )}
       {!loading && error && (
         <section className="content-panel error-panel">{error}</section>
       )}
@@ -150,7 +96,7 @@ function PreorderPage() {
                 Number(product.price || 0) * DEPOSIT_RATIO,
               )}`}
               primaryAction={() => handlePreorder(product)}
-              primaryDisabled={submittingId === product.product_id}
+              primaryDisabled={false}
               stockLabel="Đặt trước"
               stockClass="preorder"
             />

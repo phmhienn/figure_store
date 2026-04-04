@@ -7,7 +7,7 @@ const userModel = require("../models/userModel");
 const {
   createPaymentUrl,
   verifyIpnSignature,
-} = require("../services/vnpayService");
+} = require("../services/momoService");
 const { sendPreorderCodeEmail } = require("../services/emailService");
 const {
   validatePhone,
@@ -94,49 +94,48 @@ const createPreorder = async (req, res, next) => {
       contactPhone: rawPhone,
     });
 
-    const vnpayTxnRef = `${preorder.preorder_id}${Date.now()}`;
+    const gatewayTxnRef = `MO${preorder.preorder_id}-${Date.now()}`;
     let payUrl;
+    let paymentResponse;
 
     try {
-      const forwarded = req.headers["x-forwarded-for"];
-      const rawIp =
-        typeof forwarded === "string" && forwarded.length
-          ? forwarded.split(",")[0].trim()
-          : req.ip;
-      const normalizedIp = rawIp && rawIp.includes(":") ? "127.0.0.1" : rawIp;
-
-      payUrl = createPaymentUrl({
+      paymentResponse = await createPaymentUrl({
         amount: depositAmount,
-        orderId: vnpayTxnRef,
+        orderId: gatewayTxnRef,
         orderInfo: code,
-        ipAddr: normalizedIp || "127.0.0.1",
+        requestId: gatewayTxnRef,
+        extraData: {
+          preorderId: preorder.preorder_id,
+          preorderCode: code,
+        },
       });
+      payUrl = paymentResponse.payUrl;
 
-      if (process.env.VNP_DEBUG === "true") {
-        console.log("[VNPay] payUrl:", payUrl);
+      if (process.env.MOMO_DEBUG === "true") {
+        console.log("[MoMo] payUrl:", payUrl);
       }
     } catch (paymentError) {
       await preorderModel.updateStatus(preorder.preorder_id, "payment_failed");
       return res.status(400).json({
-        message: paymentError.message || "Không thể tạo thanh toán VNPay.",
+        message: paymentError.message || "Không thể tạo thanh toán MoMo.",
       });
     }
 
     if (!payUrl) {
       await preorderModel.updateStatus(preorder.preorder_id, "payment_failed");
       return res.status(400).json({
-        message: "Không thể tạo thanh toán VNPay.",
+        message: "Không thể tạo thanh toán MoMo.",
       });
     }
 
     await preorderPaymentModel.create({
       preorderId: preorder.preorder_id,
-      method: "vnpay",
+      method: "momo",
       status: "pending",
       amount: depositAmount,
-      vnpayTxnRef,
+      gatewayTxnRef,
       payUrl,
-      responseRaw: JSON.stringify({ payUrl }),
+      responseRaw: JSON.stringify(paymentResponse || { payUrl }),
     });
 
     return res.status(201).json({
@@ -180,10 +179,45 @@ const lookupPreorder = async (req, res, next) => {
   }
 };
 
+const getMyPreorders = async (req, res, next) => {
+  try {
+    const preorders = await preorderModel.findByUserId(req.user.userId);
+
+    const hydrated = await Promise.all(
+      preorders.map(async (preorder) => {
+        const product = await productModel.findById(preorder.product_id);
+        return { ...preorder, product };
+      }),
+    );
+
+    return res.json(hydrated);
+  } catch (error) {
+    return next(error);
+  }
+};
+
 const getAllPreorders = async (_req, res, next) => {
   try {
     const preorders = await preorderModel.findAll();
-    return res.json(preorders);
+    const hydrated = await Promise.all(
+      preorders.map(async (preorder) => {
+        const product = await productModel.findById(preorder.product_id);
+        const user = await userModel.findById(preorder.user_id);
+        const safeUser = user
+          ? {
+              user_id: user.user_id,
+              username: user.username,
+              email: user.email,
+              full_name: user.full_name,
+              phone: user.phone,
+              role: user.role,
+            }
+          : null;
+        return { ...preorder, product, user: safeUser };
+      }),
+    );
+
+    return res.json(hydrated);
   } catch (error) {
     return next(error);
   }
@@ -222,35 +256,30 @@ const updatePreorderStatus = async (req, res, next) => {
   }
 };
 
-const handleVnpayIpn = async (req, res, next) => {
+const handleMomoIpn = async (req, res, next) => {
   try {
-    const payload = req.query || {};
+    const payload = req.body || {};
 
     if (!verifyIpnSignature(payload)) {
-      return res
-        .status(200)
-        .json({ RspCode: "97", Message: "Invalid signature" });
+      return res.status(401).json({ message: "Invalid signature" });
     }
 
-    const vnpayTxnRef = payload.vnp_TxnRef;
-    const payment = await preorderPaymentModel.findByVnpayTxnRef(vnpayTxnRef);
+    const payment = await preorderPaymentModel.findByGatewayTxnRef(
+      payload.orderId,
+    );
 
     if (!payment) {
-      return res
-        .status(200)
-        .json({ RspCode: "01", Message: "Order not found" });
+      return res.status(404).json({ message: "Order not found" });
     }
 
     const responseRaw = JSON.stringify(payload);
-    const isSuccess =
-      payload.vnp_ResponseCode === "00" &&
-      payload.vnp_TransactionStatus === "00";
+    const isSuccess = Number(payload.resultCode) === 0;
 
     if (isSuccess) {
       await preorderPaymentModel.markPaid({
         paymentId: payment.payment_id,
-        transactionNo: payload.vnp_TransactionNo,
-        responseCode: payload.vnp_ResponseCode,
+        transactionNo: payload.transId,
+        responseCode: String(payload.resultCode),
         responseRaw,
       });
 
@@ -284,7 +313,7 @@ const handleVnpayIpn = async (req, res, next) => {
       await preorderModel.updateStatus(payment.preorder_id, "payment_failed");
     }
 
-    return res.status(200).json({ RspCode: "00", Message: "Success" });
+    return res.status(204).send();
   } catch (error) {
     return next(error);
   }
@@ -293,7 +322,8 @@ const handleVnpayIpn = async (req, res, next) => {
 module.exports = {
   createPreorder,
   lookupPreorder,
+  getMyPreorders,
   getAllPreorders,
   updatePreorderStatus,
-  handleVnpayIpn,
+  handleMomoIpn,
 };

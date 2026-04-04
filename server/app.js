@@ -17,6 +17,7 @@ const reportRoutes = require("./routes/reportRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const newsRoutes = require("./routes/newsRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const preorderModel = require("./models/preorderModel");
 const {
   notFoundHandler,
   errorHandler,
@@ -27,6 +28,9 @@ dotenv.config();
 const app = express();
 const PORT = Number(process.env.PORT || 5000);
 const clientUrl = process.env.CLIENT_URL || "http://localhost:5174";
+const PREORDER_PENDING_TTL_MINUTES = Number(
+  process.env.PREORDER_PENDING_TTL_MINUTES || 10,
+);
 
 // Debug: log CORS config
 if (process.env.NODE_ENV !== "production") {
@@ -120,6 +124,19 @@ const getDatabaseErrorMessage = (error) => {
 const bootstrap = async () => {
   await testConnection();
   await createServer(PORT);
+
+  const runCleanup = async () => {
+    try {
+      await preorderModel.purgeExpiredPreorders(PREORDER_PENDING_TTL_MINUTES);
+    } catch (error) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Preorder cleanup failed:", error.message);
+      }
+    }
+  };
+
+  runCleanup();
+  setInterval(runCleanup, 60 * 1000);
 };
 
 if (require.main === module) {

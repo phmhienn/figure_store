@@ -5,7 +5,7 @@ const create = async ({
   method,
   status,
   amount,
-  vnpayTxnRef,
+  gatewayTxnRef,
   payUrl,
   responseRaw,
 }) => {
@@ -15,16 +15,16 @@ const create = async ({
         (preorder_id, method, status, amount, vnpay_txn_ref, pay_url, response_raw)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
-    [preorderId, method, status, amount, vnpayTxnRef, payUrl, responseRaw],
+    [preorderId, method, status, amount, gatewayTxnRef, payUrl, responseRaw],
   );
 
   return result.insertId;
 };
 
-const findByVnpayTxnRef = async (vnpayTxnRef) => {
+const findByGatewayTxnRef = async (gatewayTxnRef) => {
   const [rows] = await pool.execute(
     "SELECT * FROM preorder_payments WHERE vnpay_txn_ref = ?",
-    [vnpayTxnRef],
+    [gatewayTxnRef],
   );
   return rows[0] || null;
 };
@@ -63,7 +63,7 @@ const markFailed = async ({ paymentId, responseRaw }) => {
 
 module.exports = {
   create,
-  findByVnpayTxnRef,
+  findByGatewayTxnRef,
   markPaid,
   markFailed,
 };

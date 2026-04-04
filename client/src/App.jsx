@@ -7,6 +7,7 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminHomePage from "./pages/AdminHomePage";
 import AdminNewsPage from "./pages/AdminNewsPage";
 import AdminOrdersPage from "./pages/AdminOrdersPage";
+import AdminPreordersPage from "./pages/AdminPreordersPage";
 import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminStaffPage from "./pages/AdminStaffPage";
 import CartPage from "./pages/CartPage";
@@ -17,6 +18,7 @@ import NewArrivalsPage from "./pages/NewArrivalsPage";
 import NewsDetailPage from "./pages/NewsDetailPage";
 import NewsPage from "./pages/NewsPage";
 import PreorderPage from "./pages/PreorderPage";
+import PreorderCheckoutPage from "./pages/PreorderCheckoutPage";
 import ReadyStockPage from "./pages/ReadyStockPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import PreorderLookupPage from "./pages/PreorderLookupPage";
@@ -88,6 +90,22 @@ function App() {
           <Route path="/cart" element={<CartPage />} />
           <Route path="/shipping-warranty" element={<ShippingWarrantyPage />} />
           <Route path="/preorder-lookup" element={<PreorderLookupPage />} />
+          <Route
+            path="/preorder/checkout/:id"
+            element={
+              <ProtectedRoute>
+                <PreorderCheckoutPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/preorders"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "staff"]}>
+                <AdminPreordersPage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/news" element={<NewsPage />} />
           <Route path="/news/:id" element={<NewsDetailPage />} />
           <Route path="/new-arrivals" element={<NewArrivalsPage />} />

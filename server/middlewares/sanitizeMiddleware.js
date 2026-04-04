@@ -71,7 +71,7 @@ const sanitizeObject = (obj, req) => {
  * Runs after express.json() so req.body is already parsed.
  */
 const sanitizeInput = (req, _res, next) => {
-  if (req.originalUrl?.startsWith("/api/preorders/vnpay/ipn")) {
+  if (req.originalUrl?.startsWith("/api/preorders/momo/ipn")) {
     return next();
   }
 

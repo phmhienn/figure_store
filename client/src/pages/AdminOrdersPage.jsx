@@ -105,6 +105,9 @@ function AdminOrdersPage() {
           <Link to="/admin" className="ghost-button">
             Bảng điều khiển
           </Link>
+          <Link to="/admin/preorders" className="ghost-button">
+            Preorder
+          </Link>
           {isAdmin && (
             <Link to="/admin/products" className="ghost-button">
               Quản trị sản phẩm

@@ -19,6 +19,46 @@ const buildStatusFilter = (statuses) => {
 const getRevenueSeries = async ({ group, from, to, statuses }) => {
   const format = GROUP_FORMATS[group] || GROUP_FORMATS.day;
   const statusFilter = buildStatusFilter(statuses);
+  const includePreorders =
+    Array.isArray(statuses) && statuses.includes("completed");
+
+  if (includePreorders) {
+    const [rows] = await pool.execute(
+      `
+        SELECT period,
+               SUM(total_revenue) AS total_revenue,
+               SUM(order_count) AS order_count
+        FROM (
+          SELECT DATE_FORMAT(o.created_at, ?) AS period,
+                 SUM(o.total_amount) AS total_revenue,
+                 COUNT(*) AS order_count
+          FROM orders o
+          WHERE ${statusFilter.clause}
+            AND o.created_at BETWEEN ? AND ?
+          GROUP BY period
+
+          UNION ALL
+
+          SELECT DATE_FORMAT(p.updated_at, ?) AS period,
+                 SUM(p.price_at_order * p.quantity) AS total_revenue,
+                 COUNT(*) AS order_count
+          FROM preorders p
+          WHERE p.status = 'completed'
+            AND p.updated_at BETWEEN ? AND ?
+          GROUP BY period
+        ) summary
+        GROUP BY period
+        ORDER BY period
+      `,
+      [format, ...statusFilter.values, from, to, format, from, to],
+    );
+
+    return rows.map((row) => ({
+      period: row.period,
+      total_revenue: Number(row.total_revenue || 0),
+      order_count: Number(row.order_count || 0),
+    }));
+  }
 
   const [rows] = await pool.execute(
     `

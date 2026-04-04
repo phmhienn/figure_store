@@ -14,6 +14,11 @@ const adminLinks = [
     to: "/admin/orders",
   },
   {
+    title: "Quản lý preorder",
+    copy: "Theo dõi đơn đặt trước và cập nhật trạng thái cọc.",
+    to: "/admin/preorders",
+  },
+  {
     title: "Thống kê & báo cáo",
     copy: "Báo cáo doanh thu, sản phẩm bán chạy và tồn kho.",
     to: "/admin/reports",
@@ -36,7 +41,7 @@ function AdminHomePage() {
   const visibleLinks = isAdmin
     ? adminLinks
     : adminLinks.filter((item) =>
-        ["/admin/orders", "/admin/news"].includes(item.to),
+        ["/admin/orders", "/admin/preorders", "/admin/news"].includes(item.to),
       );
 
   return (

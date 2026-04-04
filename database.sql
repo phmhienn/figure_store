@@ -235,7 +235,7 @@ CREATE TABLE preorders (
 CREATE TABLE preorder_payments (
     payment_id INT AUTO_INCREMENT PRIMARY KEY,
     preorder_id INT NOT NULL,
-    method VARCHAR(50) DEFAULT 'vnpay',
+    method VARCHAR(50) DEFAULT 'momo',
     status VARCHAR(20) DEFAULT 'pending',
     amount DECIMAL(10,2) NOT NULL,
     vnpay_txn_ref VARCHAR(100),
