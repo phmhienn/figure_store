@@ -20,6 +20,16 @@ const orderStatusLabels = {
   cancelled: "Đã hủy",
 };
 
+const preorderStatusLabels = {
+  requested: "Chờ thanh toán cọc",
+  deposited: "Đã cọc",
+  in_transit: "Đang về",
+  ready_to_pay: "Hàng đã về",
+  completed: "Hoàn tất",
+  cancelled: "Đã hủy",
+  payment_failed: "Thanh toán lỗi",
+};
+
 const productStatusLabels = {
   active: "Đang bán",
   inactive: "Tạm ẩn",
@@ -44,6 +54,9 @@ const categoryLabels = {
 
 export const formatOrderStatus = (value) =>
   orderStatusLabels[value] || value || "Chưa cập nhật";
+
+export const formatPreorderStatus = (value) =>
+  preorderStatusLabels[value] || value || "Chưa cập nhật";
 
 export const formatProductStatus = (value) =>
   productStatusLabels[value] || value || "Chưa cập nhật";

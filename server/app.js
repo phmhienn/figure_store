@@ -12,8 +12,11 @@ const { sanitizeInput } = require("./middlewares/sanitizeMiddleware");
 const productRoutes = require("./routes/productRoutes");
 const userRoutes = require("./routes/userRoutes");
 const orderRoutes = require("./routes/orderRoutes");
+const preorderRoutes = require("./routes/preorderRoutes");
+const reportRoutes = require("./routes/reportRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const newsRoutes = require("./routes/newsRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 const {
   notFoundHandler,
   errorHandler,
@@ -64,6 +67,9 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/products", productRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/preorders", preorderRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/reviews", reviewRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/news", newsRoutes);
 

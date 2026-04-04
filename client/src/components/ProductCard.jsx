@@ -7,8 +7,27 @@ import {
   resolveImageUrl,
 } from "../utils/format";
 
-function ProductCard({ product, onAddToCart }) {
+function ProductCard({
+  product,
+  onAddToCart,
+  primaryAction,
+  primaryActionLabel,
+  primaryDisabled,
+  secondaryActionLabel,
+  secondaryActionTo,
+  stockLabel,
+  stockClass,
+}) {
   const isInStock = Number(product.stock_quantity) > 0;
+  const fallbackPrimaryLabel = isInStock ? "Thêm giỏ hàng" : "Tạm hết hàng";
+  const resolvedPrimaryLabel = primaryActionLabel || fallbackPrimaryLabel;
+  const handlePrimaryAction =
+    primaryAction || (onAddToCart ? () => onAddToCart(product) : null);
+  const isPrimaryDisabled =
+    primaryDisabled ?? (!isInStock || !handlePrimaryAction);
+  const resolvedSecondaryLabel = secondaryActionLabel || "Xem chi tiết";
+  const resolvedSecondaryTo =
+    secondaryActionTo || `/products/${product.product_id}`;
 
   return (
     <article className="product-card">
@@ -29,8 +48,13 @@ function ProductCard({ product, onAddToCart }) {
 
       <div className="product-meta-row">
         <span>{formatCategory(product.category)}</span>
-        <span className={`stock-chip ${isInStock ? "in-stock" : "sold-out"}`}>
-          {isInStock ? `Còn ${product.stock_quantity}` : "Hết hàng"}
+        <span
+          className={`stock-chip ${
+            stockClass || (isInStock ? "in-stock" : "sold-out")
+          }`}
+        >
+          {stockLabel ||
+            (isInStock ? `Còn ${product.stock_quantity}` : "Hết hàng")}
         </span>
       </div>
 
@@ -42,23 +66,28 @@ function ProductCard({ product, onAddToCart }) {
       <div className="product-footer">
         <div className="product-price">
           <strong>{formatCurrency(product.price)}</strong>
-          <p>{product.brand || "Hãng sản xuất đang cập nhật"}</p>
+          <div className="product-price-meta">
+            <p>{product.brand || "Hãng sản xuất đang cập nhật"}</p>
+            <span className="product-views">
+              Lượt xem: {Number(product.view_count || 0)}
+            </span>
+          </div>
         </div>
 
         <div className="product-actions">
           <Link
-            to={`/products/${product.product_id}`}
+            to={resolvedSecondaryTo}
             className="ghost-button link-button compact-button"
           >
-            Xem chi tiết
+            {resolvedSecondaryLabel}
           </Link>
           <button
             type="button"
             className="primary-button compact-button"
-            onClick={() => onAddToCart(product)}
-            disabled={!isInStock}
+            onClick={handlePrimaryAction}
+            disabled={isPrimaryDisabled}
           >
-            {isInStock ? "Thêm giỏ hàng" : "Tạm hết hàng"}
+            {resolvedPrimaryLabel}
           </button>
         </div>
       </div>

@@ -13,7 +13,9 @@ const detectSchema = async () => {
     await pool.execute("SELECT 1 FROM product_images LIMIT 1");
     _schemaMode = "normalized";
     return _schemaMode;
-  } catch (_e) { /* product_images table not found */ }
+  } catch (_e) {
+    /* product_images table not found */
+  }
 
   try {
     await pool.execute("SELECT slug FROM products LIMIT 1");
@@ -31,7 +33,7 @@ const NORM_SELECT = `
   SELECT
     p.product_id, p.name, p.slug,
     p.description, p.price, p.stock_quantity,
-    p.release_date, p.status, p.created_at,
+    p.view_count, p.release_date, p.status, p.created_at,
     COALESCE(
       (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.product_id AND pi.is_main = 1 ORDER BY pi.image_id ASC LIMIT 1),
       (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.product_id ORDER BY pi.image_id ASC LIMIT 1)
@@ -44,14 +46,14 @@ const NORM_SELECT = `
 
 const FLAT_SLUG_SELECT = `
   SELECT p.product_id, p.name, p.slug, p.description,
-         p.price, p.stock_quantity, p.status, p.created_at,
+         p.price, p.stock_quantity, p.view_count, p.status, p.created_at,
          p.image_url, p.category, p.series, p.brand
   FROM products p
 `;
 
 const FLAT_SELECT = `
   SELECT p.product_id, p.name, p.description,
-         p.price, p.stock_quantity, p.status, p.created_at,
+         p.price, p.stock_quantity, p.view_count, p.status, p.created_at,
          p.image_url, p.category, p.series, p.brand
   FROM products p
 `;
@@ -73,14 +75,27 @@ const findAll = async () => {
   return rows;
 };
 
-const findPaginated = async ({ page = 1, limit = 10, category, search } = {}) => {
+const findPaginated = async ({
+  page = 1,
+  limit = 10,
+  category,
+  search,
+  inStockOnly,
+} = {}) => {
   const schema = await detectSchema();
-  const SELECT = schema === "normalized" ? NORM_SELECT
-    : schema === "flat-with-slug" ? FLAT_SLUG_SELECT
-    : FLAT_SELECT;
+  const SELECT =
+    schema === "normalized"
+      ? NORM_SELECT
+      : schema === "flat-with-slug"
+        ? FLAT_SLUG_SELECT
+        : FLAT_SELECT;
 
   const whereClauses = ["p.status = ?"];
   const params = ["active"];
+
+  if (inStockOnly) {
+    whereClauses.push("p.stock_quantity > 0");
+  }
 
   if (category) {
     if (schema === "normalized") {
@@ -128,17 +143,33 @@ const findById = async (id) => {
   return rows[0] || null;
 };
 
+const incrementViewCount = async (id) => {
+  const [result] = await pool.execute(
+    "UPDATE products SET view_count = COALESCE(view_count, 0) + 1 WHERE product_id = ?",
+    [id],
+  );
+  return result.affectedRows > 0;
+};
+
 // ── Write helpers ────────────────────────────────────────────────────
 
 const slugify = (value) =>
-  value.toString().trim().toLowerCase()
+  value
+    .toString()
+    .trim()
+    .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
 const findOrCreateLookup = async (conn, table, idCol, name) => {
-  const [rows] = await conn.execute(`SELECT ${idCol} FROM ${table} WHERE name = ?`, [name]);
+  const [rows] = await conn.execute(
+    `SELECT ${idCol} FROM ${table} WHERE name = ?`,
+    [name],
+  );
   if (rows.length) return rows[0][idCol];
-  const [res] = await conn.execute(`INSERT INTO ${table} (name) VALUES (?)`, [name]);
+  const [res] = await conn.execute(`INSERT INTO ${table} (name) VALUES (?)`, [
+    name,
+  ]);
   return res.insertId;
 };
 
@@ -150,13 +181,21 @@ const create = async (productData) => {
   if (schema !== "normalized") {
     // flat or flat-with-slug
     const hasSlug = schema === "flat-with-slug";
-    const slug = hasSlug ? (productData.slug?.trim() || slugify(productData.name || "")) : null;
+    const slug = hasSlug
+      ? productData.slug?.trim() || slugify(productData.name || "")
+      : null;
 
     const cols = [
       "name",
       ...(hasSlug ? ["slug"] : []),
-      "description", "price", "stock_quantity", "image_url",
-      "category", "series", "brand", "status",
+      "description",
+      "price",
+      "stock_quantity",
+      "image_url",
+      "category",
+      "series",
+      "brand",
+      "status",
     ].join(", ");
 
     const vals = [
@@ -190,9 +229,11 @@ const create = async (productData) => {
       `INSERT INTO products (name, slug, description, price, stock_quantity, status)
        VALUES (?, ?, ?, ?, ?, ?)`,
       [
-        productData.name, slug,
+        productData.name,
+        slug,
         productData.description || "",
-        productData.price, productData.stock_quantity ?? 0,
+        productData.price,
+        productData.stock_quantity ?? 0,
         productData.status === "inactive" ? "inactive" : "active",
       ],
     );
@@ -205,16 +246,40 @@ const create = async (productData) => {
       );
     }
     if (productData.category) {
-      const cid = await findOrCreateLookup(connection, "categories", "category_id", productData.category);
-      await connection.execute(`INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)`, [productId, cid]);
+      const cid = await findOrCreateLookup(
+        connection,
+        "categories",
+        "category_id",
+        productData.category,
+      );
+      await connection.execute(
+        `INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)`,
+        [productId, cid],
+      );
     }
     if (productData.series) {
-      const sid = await findOrCreateLookup(connection, "series", "series_id", productData.series);
-      await connection.execute(`INSERT INTO product_series (product_id, series_id) VALUES (?, ?)`, [productId, sid]);
+      const sid = await findOrCreateLookup(
+        connection,
+        "series",
+        "series_id",
+        productData.series,
+      );
+      await connection.execute(
+        `INSERT INTO product_series (product_id, series_id) VALUES (?, ?)`,
+        [productId, sid],
+      );
     }
     if (productData.brand) {
-      const bid = await findOrCreateLookup(connection, "brands", "brand_id", productData.brand);
-      await connection.execute(`INSERT INTO product_brands (product_id, brand_id) VALUES (?, ?)`, [productId, bid]);
+      const bid = await findOrCreateLookup(
+        connection,
+        "brands",
+        "brand_id",
+        productData.brand,
+      );
+      await connection.execute(
+        `INSERT INTO product_brands (product_id, brand_id) VALUES (?, ?)`,
+        [productId, bid],
+      );
     }
 
     await connection.commit();
@@ -234,13 +299,21 @@ const update = async (id, productData) => {
 
   if (schema !== "normalized") {
     const hasSlug = schema === "flat-with-slug";
-    const slug = hasSlug ? (productData.slug?.trim() || slugify(productData.name || "")) : null;
+    const slug = hasSlug
+      ? productData.slug?.trim() || slugify(productData.name || "")
+      : null;
 
     const setCols = [
       "name = ?",
       ...(hasSlug ? ["slug = ?"] : []),
-      "description = ?", "price = ?", "stock_quantity = ?",
-      "image_url = ?", "category = ?", "series = ?", "brand = ?", "status = ?",
+      "description = ?",
+      "price = ?",
+      "stock_quantity = ?",
+      "image_url = ?",
+      "category = ?",
+      "series = ?",
+      "brand = ?",
+      "status = ?",
     ].join(", ");
 
     const vals = [
@@ -275,36 +348,80 @@ const update = async (id, productData) => {
       `UPDATE products SET name = ?, slug = ?, description = ?, price = ?, stock_quantity = ?, status = ?
        WHERE product_id = ?`,
       [
-        productData.name, slug,
+        productData.name,
+        slug,
         productData.description || "",
-        productData.price, productData.stock_quantity ?? 0,
+        productData.price,
+        productData.stock_quantity ?? 0,
         productData.status === "inactive" ? "inactive" : "active",
         id,
       ],
     );
-    if (!result.affectedRows) { await connection.rollback(); return null; }
+    if (!result.affectedRows) {
+      await connection.rollback();
+      return null;
+    }
 
     if (productData.image_url) {
-      await connection.execute(`DELETE FROM product_images WHERE product_id = ? AND is_main = 1`, [id]);
-      await connection.execute(`INSERT INTO product_images (product_id, image_url, is_main) VALUES (?, ?, 1)`, [id, productData.image_url]);
+      await connection.execute(
+        `DELETE FROM product_images WHERE product_id = ? AND is_main = 1`,
+        [id],
+      );
+      await connection.execute(
+        `INSERT INTO product_images (product_id, image_url, is_main) VALUES (?, ?, 1)`,
+        [id, productData.image_url],
+      );
     }
 
-    await connection.execute(`DELETE FROM product_categories WHERE product_id = ?`, [id]);
+    await connection.execute(
+      `DELETE FROM product_categories WHERE product_id = ?`,
+      [id],
+    );
     if (productData.category) {
-      const cid = await findOrCreateLookup(connection, "categories", "category_id", productData.category);
-      await connection.execute(`INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)`, [id, cid]);
+      const cid = await findOrCreateLookup(
+        connection,
+        "categories",
+        "category_id",
+        productData.category,
+      );
+      await connection.execute(
+        `INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)`,
+        [id, cid],
+      );
     }
 
-    await connection.execute(`DELETE FROM product_series WHERE product_id = ?`, [id]);
+    await connection.execute(
+      `DELETE FROM product_series WHERE product_id = ?`,
+      [id],
+    );
     if (productData.series) {
-      const sid = await findOrCreateLookup(connection, "series", "series_id", productData.series);
-      await connection.execute(`INSERT INTO product_series (product_id, series_id) VALUES (?, ?)`, [id, sid]);
+      const sid = await findOrCreateLookup(
+        connection,
+        "series",
+        "series_id",
+        productData.series,
+      );
+      await connection.execute(
+        `INSERT INTO product_series (product_id, series_id) VALUES (?, ?)`,
+        [id, sid],
+      );
     }
 
-    await connection.execute(`DELETE FROM product_brands WHERE product_id = ?`, [id]);
+    await connection.execute(
+      `DELETE FROM product_brands WHERE product_id = ?`,
+      [id],
+    );
     if (productData.brand) {
-      const bid = await findOrCreateLookup(connection, "brands", "brand_id", productData.brand);
-      await connection.execute(`INSERT INTO product_brands (product_id, brand_id) VALUES (?, ?)`, [id, bid]);
+      const bid = await findOrCreateLookup(
+        connection,
+        "brands",
+        "brand_id",
+        productData.brand,
+      );
+      await connection.execute(
+        `INSERT INTO product_brands (product_id, brand_id) VALUES (?, ?)`,
+        [id, bid],
+      );
     }
 
     await connection.commit();
@@ -320,8 +437,19 @@ const update = async (id, productData) => {
 // ── Delete ───────────────────────────────────────────────────────────
 
 const deleteProduct = async (id) => {
-  const [result] = await pool.execute("DELETE FROM products WHERE product_id = ?", [id]);
+  const [result] = await pool.execute(
+    "DELETE FROM products WHERE product_id = ?",
+    [id],
+  );
   return result.affectedRows > 0;
 };
 
-module.exports = { findAll, findPaginated, findById, create, update, delete: deleteProduct };
+module.exports = {
+  findAll,
+  findPaginated,
+  findById,
+  incrementViewCount,
+  create,
+  update,
+  delete: deleteProduct,
+};

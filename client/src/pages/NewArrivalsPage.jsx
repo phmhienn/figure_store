@@ -16,7 +16,11 @@ function NewArrivalsPage() {
       setError("");
 
       try {
-        const result = await productService.getAll({ page: 1, limit: 12 });
+        const result = await productService.getAll({
+          page: 1,
+          limit: 12,
+          inStockOnly: true,
+        });
         setProducts(result.data);
       } catch (requestError) {
         setError(

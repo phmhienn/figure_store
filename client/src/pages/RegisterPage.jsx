@@ -1,42 +1,67 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from "../context/AuthContext";
 
 function RegisterPage() {
   const navigate = useNavigate();
   const { register } = useAuth();
   const [formData, setFormData] = useState({
-    username: '',
-    full_name: '',
-    phone: '',
-    email: '',
-    password: '',
+    username: "",
+    full_name: "",
+    phone: "",
+    email: "",
+    password: "",
   });
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const navigateTimer = useRef(null);
+
+  const clearTimers = () => {
+    if (navigateTimer.current) {
+      clearTimeout(navigateTimer.current);
+      navigateTimer.current = null;
+    }
+  };
+
+  const dispatchAppToast = (payload) => {
+    window.dispatchEvent(new CustomEvent("app-toast", { detail: payload }));
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError('');
+    clearTimers();
 
     try {
       setSubmitting(true);
       await register(formData);
-      navigate('/', { replace: true });
+      dispatchAppToast({
+        type: "success",
+        text: "Đăng ký thành công. Đang chuyển hướng...",
+      });
+      navigateTimer.current = setTimeout(() => {
+        navigate("/", { replace: true });
+      }, 1200);
     } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Đăng ký thất bại.');
+      dispatchAppToast({
+        type: "error",
+        text: requestError.response?.data?.message || "Đăng ký thất bại.",
+      });
     } finally {
       setSubmitting(false);
     }
   };
+
+  useEffect(() => () => clearTimers(), []);
 
   return (
     <section className="auth-shell content-panel">
       <div>
         <p className="eyebrow">Tài khoản mới</p>
         <h1>Đăng ký</h1>
-        <p>Tạo tài khoản khách hàng để lưu thông tin đặt hàng, lịch sử mua và các quyền lợi thành viên.</p>
+        <p>
+          Tạo tài khoản khách hàng để lưu thông tin đặt hàng, lịch sử mua và các
+          quyền lợi thành viên.
+        </p>
       </div>
 
       <form className="stacked-form" onSubmit={handleSubmit}>
@@ -45,7 +70,12 @@ function RegisterPage() {
           <input
             type="text"
             value={formData.username}
-            onChange={(event) => setFormData((current) => ({ ...current, username: event.target.value }))}
+            onChange={(event) =>
+              setFormData((current) => ({
+                ...current,
+                username: event.target.value,
+              }))
+            }
             required
           />
         </label>
@@ -55,7 +85,12 @@ function RegisterPage() {
           <input
             type="text"
             value={formData.full_name}
-            onChange={(event) => setFormData((current) => ({ ...current, full_name: event.target.value }))}
+            onChange={(event) =>
+              setFormData((current) => ({
+                ...current,
+                full_name: event.target.value,
+              }))
+            }
           />
         </label>
 
@@ -64,7 +99,12 @@ function RegisterPage() {
           <input
             type="text"
             value={formData.phone}
-            onChange={(event) => setFormData((current) => ({ ...current, phone: event.target.value }))}
+            onChange={(event) =>
+              setFormData((current) => ({
+                ...current,
+                phone: event.target.value,
+              }))
+            }
           />
         </label>
 
@@ -73,7 +113,12 @@ function RegisterPage() {
           <input
             type="email"
             value={formData.email}
-            onChange={(event) => setFormData((current) => ({ ...current, email: event.target.value }))}
+            onChange={(event) =>
+              setFormData((current) => ({
+                ...current,
+                email: event.target.value,
+              }))
+            }
             required
           />
         </label>
@@ -83,7 +128,12 @@ function RegisterPage() {
           <input
             type="password"
             value={formData.password}
-            onChange={(event) => setFormData((current) => ({ ...current, password: event.target.value }))}
+            onChange={(event) =>
+              setFormData((current) => ({
+                ...current,
+                password: event.target.value,
+              }))
+            }
             required
             minLength={8}
           />
@@ -92,10 +142,8 @@ function RegisterPage() {
           </span>
         </label>
 
-        {error && <p className="form-error">{error}</p>}
-
         <button type="submit" className="primary-button" disabled={submitting}>
-          {submitting ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'}
+          {submitting ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
         </button>
 
         <p>

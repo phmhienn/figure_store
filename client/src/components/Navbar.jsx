@@ -46,7 +46,7 @@ const utilityLinks = [
     icon: TruckIcon,
   },
   {
-    label: "Tra cứu đơn đặt trước",
+    label: "Tra cứu đơn hàng",
     to: "/preorder-lookup#lookup",
     matchPath: "/preorder-lookup",
     matchHash: "#lookup",

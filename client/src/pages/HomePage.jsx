@@ -52,6 +52,7 @@ function HomePage() {
         const result = await productService.getAll({
           page,
           limit: PRODUCTS_PER_PAGE,
+          inStockOnly: true,
           ...(searchQuery ? { search: searchQuery } : {}),
         });
         setProducts(result.data);

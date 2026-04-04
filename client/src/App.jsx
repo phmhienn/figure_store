@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -6,6 +7,7 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import AdminHomePage from "./pages/AdminHomePage";
 import AdminNewsPage from "./pages/AdminNewsPage";
 import AdminOrdersPage from "./pages/AdminOrdersPage";
+import AdminReportsPage from "./pages/AdminReportsPage";
 import AdminStaffPage from "./pages/AdminStaffPage";
 import CartPage from "./pages/CartPage";
 import HomePage from "./pages/HomePage";
@@ -25,8 +27,58 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ShippingWarrantyPage from "./pages/ShippingWarrantyPage";
 
 function App() {
+  const location = useLocation();
+  const [appToast, setAppToast] = useState(null);
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem("app_toast");
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.text) {
+        setAppToast(parsed);
+      }
+    } catch (_error) {
+      // Ignore malformed toast payloads.
+    } finally {
+      sessionStorage.removeItem("app_toast");
+    }
+  }, [location.key]);
+
+  useEffect(() => {
+    const handleToastEvent = (event) => {
+      const payload = event?.detail;
+      if (payload?.text) {
+        setAppToast(payload);
+      }
+    };
+
+    window.addEventListener("app-toast", handleToastEvent);
+    return () => window.removeEventListener("app-toast", handleToastEvent);
+  }, []);
+
+  useEffect(() => {
+    if (!appToast) return undefined;
+    const timer = setTimeout(() => setAppToast(null), 3200);
+    return () => clearTimeout(timer);
+  }, [appToast]);
+
   return (
     <div className="app-shell">
+      {appToast && (
+        <div className={`toast-notice ${appToast.type || ""}`}>
+          <span>{appToast.text}</span>
+          <button
+            type="button"
+            className="toast-close"
+            onClick={() => setAppToast(null)}
+            aria-label="Đóng thông báo"
+          >
+            ×
+          </button>
+        </div>
+      )}
       <Navbar />
 
       <main className="page-shell">
@@ -82,6 +134,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["admin", "staff"]}>
                 <AdminNewsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedRoute adminOnly>
+                <AdminReportsPage />
               </ProtectedRoute>
             }
           />

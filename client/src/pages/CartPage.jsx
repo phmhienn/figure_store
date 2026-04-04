@@ -331,6 +331,14 @@ function CartPage() {
                     <small>
                       x{item.quantity} - {formatCurrency(item.price)}
                     </small>
+                    {order.status === "completed" && (
+                      <Link
+                        to={`/products/${item.product_id}#reviews`}
+                        className="ghost-button link-button compact-button"
+                      >
+                        Đánh giá
+                      </Link>
+                    )}
                   </div>
                 ))}
               </div>

@@ -12,7 +12,6 @@ function PreorderLookupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState({ type: "", text: "" });
-  const [cancellingId, setCancellingId] = useState(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -29,7 +28,7 @@ function PreorderLookupPage() {
         const data = await orderService.getMyOrders();
         setOrders(data);
       } catch (_requestError) {
-        setError("Không thể tải danh sách đơn đặt trước lúc này.");
+        setError("Không thể tải danh sách đơn hàng lúc này.");
       } finally {
         setLoading(false);
       }
@@ -37,32 +36,6 @@ function PreorderLookupPage() {
 
     fetchOrders();
   }, [isAuthenticated]);
-
-  const handleCancelOrder = async (orderId) => {
-    if (!window.confirm("Bạn có chắc muốn hủy đơn hàng này?")) return;
-
-    setMessage({ type: "", text: "" });
-    setCancellingId(orderId);
-
-    try {
-      await orderService.cancelOrder(orderId);
-      setOrders((current) =>
-        current.map((order) =>
-          order.order_id === orderId
-            ? { ...order, status: "cancelled" }
-            : order,
-        ),
-      );
-      setMessage({ type: "success", text: "Đã hủy đơn hàng." });
-    } catch (requestError) {
-      setMessage({
-        type: "error",
-        text: requestError.response?.data?.message || "Không thể hủy đơn hàng.",
-      });
-    } finally {
-      setCancellingId(null);
-    }
-  };
 
   const filteredOrders = useMemo(() => {
     const normalized = query.trim();
@@ -81,16 +54,15 @@ function PreorderLookupPage() {
       <section className="section-header-row">
         <div>
           <p className="eyebrow">Thông tin tiện ích</p>
-          <h1>Tra cứu đơn đặt trước</h1>
+          <h1>Tra cứu đơn hàng</h1>
         </div>
-        <p>Nhập mã đơn để lọc nhanh tiến độ đơn preorder của bạn.</p>
+        <p>Xem toàn bộ đơn hàng và trạng thái của tài khoản.</p>
       </section>
 
       {!isAuthenticated && (
         <section className="content-panel">
           <p>
-            Vui lòng <Link to="/login">đăng nhập</Link> để xem lịch sử đơn đặt
-            trước.
+            Vui lòng <Link to="/login">đăng nhập</Link> để xem lịch sử đơn hàng.
           </p>
         </section>
       )}
@@ -111,7 +83,7 @@ function PreorderLookupPage() {
           </section>
 
           <section className="content-panel">
-            <h2>Kết quả tra cứu</h2>
+            <h2>Danh sách đơn hàng</h2>
             {message.text && (
               <div
                 className={
@@ -144,23 +116,24 @@ function PreorderLookupPage() {
                     <p>{order.shipping_address}</p>
                     <strong>{formatCurrency(order.total_amount)}</strong>
 
-                    {order.status === "pending" ? (
-                      <button
-                        type="button"
-                        className="danger-button compact-button"
-                        onClick={() => handleCancelOrder(order.order_id)}
-                        disabled={cancellingId === order.order_id}
-                      >
-                        {cancellingId === order.order_id
-                          ? "Đang hủy..."
-                          : "Hủy đơn"}
-                      </button>
-                    ) : order.status !== "cancelled" ? (
-                      <p className="order-cancel-note">
-                        Đơn đã được xác nhận. Vui lòng liên hệ hotline
-                        0396686826 để hỗ trợ.
-                      </p>
-                    ) : null}
+                    {order.status === "completed" && !!order.items?.length && (
+                      <div className="order-items-inline">
+                        {order.items.map((item) => (
+                          <div key={item.order_item_id}>
+                            <span>{item.product_name}</span>
+                            <small>
+                              x{item.quantity} - {formatCurrency(item.price)}
+                            </small>
+                            <Link
+                              to={`/products/${item.product_id}#reviews`}
+                              className="ghost-button link-button compact-button"
+                            >
+                              Đánh giá
+                            </Link>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>

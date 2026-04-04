@@ -86,7 +86,7 @@ function ShippingWarrantyPage() {
           </div>
           <div>
             <span>Làm sao theo dõi đơn hàng?</span>
-            <small>Vào mục Tra cứu đơn đặt trước hoặc liên hệ hotline.</small>
+            <small>Vào mục Tra cứu đơn hàng hoặc liên hệ hotline.</small>
           </div>
         </div>
       </section>

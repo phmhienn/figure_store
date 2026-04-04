@@ -27,12 +27,16 @@ const getAllProducts = async (req, res, next) => {
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit) || 10));
     const category = req.query.category?.trim();
     const search = req.query.search?.trim();
+    const inStockOnly =
+      String(req.query.inStockOnly || "").toLowerCase() === "true" ||
+      String(req.query.inStockOnly || "") === "1";
 
     const result = await productModel.findPaginated({
       page,
       limit,
       category,
       search,
+      inStockOnly,
     });
 
     res.json(result);
@@ -43,6 +47,12 @@ const getAllProducts = async (req, res, next) => {
 
 const getProductById = async (req, res, next) => {
   try {
+    const didIncrement = await productModel.incrementViewCount(req.params.id);
+
+    if (!didIncrement) {
+      return res.status(404).json({ message: "Product not found." });
+    }
+
     const product = await productModel.findById(req.params.id);
 
     if (!product) {

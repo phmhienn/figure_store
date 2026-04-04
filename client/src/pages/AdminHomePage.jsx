@@ -14,6 +14,11 @@ const adminLinks = [
     to: "/admin/orders",
   },
   {
+    title: "Thống kê & báo cáo",
+    copy: "Báo cáo doanh thu, sản phẩm bán chạy và tồn kho.",
+    to: "/admin/reports",
+  },
+  {
     title: "Quản lý tin tức",
     copy: "Đăng bài, chỉnh sửa nội dung và quản lý bài viết đã đăng.",
     to: "/admin/news",

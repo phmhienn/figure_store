@@ -45,7 +45,8 @@ const sendPasswordResetOtpEmail = async ({ to, otp, ttlMinutes }) => {
   }
 
   const subject = "Your password reset code";
-  const text = `We received a request to reset your password.\n\n` +
+  const text =
+    `We received a request to reset your password.\n\n` +
     `Your OTP code is: ${otp}\n` +
     `This code expires in ${ttlMinutes} minutes.\n\n` +
     `If you did not request this, you can ignore this email.`;
@@ -66,6 +67,43 @@ const sendPasswordResetOtpEmail = async ({ to, otp, ttlMinutes }) => {
   });
 };
 
+const sendPreorderCodeEmail = async ({
+  to,
+  code,
+  productName,
+  depositAmount,
+}) => {
+  const from = getFromAddress();
+  if (!from) {
+    throw new Error("SMTP_FROM is not configured");
+  }
+
+  const subject = "Ma tra cuu don dat truoc";
+  const text =
+    `Cam on ban da dat coc preorder.\n\n` +
+    `Ma tra cuu: ${code}\n` +
+    (productName ? `San pham: ${productName}\n` : "") +
+    (depositAmount ? `Tien coc: ${depositAmount} VND\n` : "") +
+    `Ban co the tra cuu tai trang Preorder Lookup.`;
+
+  const html = `
+    <p>Cam on ban da dat coc preorder.</p>
+    <p><strong>Ma tra cuu: ${code}</strong></p>
+    ${productName ? `<p>San pham: ${productName}</p>` : ""}
+    ${depositAmount ? `<p>Tien coc: ${depositAmount} VND</p>` : ""}
+    <p>Ban co the tra cuu tai trang Preorder Lookup.</p>
+  `;
+
+  await getTransporter().sendMail({
+    from,
+    to,
+    subject,
+    text,
+    html,
+  });
+};
+
 module.exports = {
   sendPasswordResetOtpEmail,
+  sendPreorderCodeEmail,
 };

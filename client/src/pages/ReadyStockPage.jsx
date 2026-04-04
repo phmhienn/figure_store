@@ -16,11 +16,12 @@ function ReadyStockPage() {
       setError("");
 
       try {
-        const result = await productService.getAll({ page: 1, limit: 24 });
-        const filtered = result.data.filter(
-          (product) => Number(product.stock_quantity) > 0,
-        );
-        setProducts(filtered);
+        const result = await productService.getAll({
+          page: 1,
+          limit: 24,
+          inStockOnly: true,
+        });
+        setProducts(result.data);
       } catch (requestError) {
         setError(
           requestError.response?.data?.message ||

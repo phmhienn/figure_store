@@ -45,6 +45,7 @@ CREATE TABLE products (
     description TEXT,
     price DECIMAL(10,2) NOT NULL,
     stock_quantity INT DEFAULT 0,
+    view_count INT DEFAULT 0,
     release_date DATE,
     status VARCHAR(20) DEFAULT 'active',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -206,6 +207,49 @@ CREATE TABLE shipping (
 );
 
 -- ============================================================
+-- Preorders & Preorder Payments
+-- ============================================================
+
+CREATE TABLE preorders (
+    preorder_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    price_at_order DECIMAL(10,2) NOT NULL,
+    deposit_ratio DECIMAL(4,2) NOT NULL DEFAULT 0.20,
+    deposit_amount DECIMAL(10,2) NOT NULL,
+    deposit_paid_at DATETIME,
+    status VARCHAR(30) DEFAULT 'requested',
+    code VARCHAR(20) NOT NULL UNIQUE,
+    contact_email VARCHAR(100) NOT NULL,
+    contact_phone VARCHAR(20) NOT NULL,
+    expected_arrival DATE,
+    note TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (user_id) REFERENCES users(user_id),
+    FOREIGN KEY (product_id) REFERENCES products(product_id)
+);
+
+CREATE TABLE preorder_payments (
+    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    preorder_id INT NOT NULL,
+    method VARCHAR(50) DEFAULT 'vnpay',
+    status VARCHAR(20) DEFAULT 'pending',
+    amount DECIMAL(10,2) NOT NULL,
+    vnpay_txn_ref VARCHAR(100),
+    vnpay_transaction_no VARCHAR(100),
+    vnpay_response_code VARCHAR(20),
+    pay_url TEXT,
+    response_raw TEXT,
+    paid_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (preorder_id) REFERENCES preorders(preorder_id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- Reviews & Wishlist
 -- ============================================================
 
@@ -267,6 +311,7 @@ CREATE INDEX idx_products_slug ON products(slug);
 CREATE INDEX idx_orders_user_id ON orders(user_id);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_reviews_product_id ON reviews(product_id);
+CREATE UNIQUE INDEX idx_reviews_user_product ON reviews(user_id, product_id);
 CREATE INDEX idx_product_images_product_id ON product_images(product_id);
 CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
 CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
@@ -322,7 +367,11 @@ INSERT INTO products (name, slug, description, price, stock_quantity, status) VA
 ('Roronoa Zoro - Battle Diorama Figure', 'roronoa-zoro-battle-diorama-figure', 'Dynamic diorama statue with sword slash effect and textured rock base.', 3490000.00, 9, 'active'),
 ('Rem - Maid Dress Figure', 'rem-maid-dress-figure', 'Elegant Rem figure with layered costume sculpt and pastel paint application.', 2390000.00, 14, 'active'),
 ('Mikasa Ackerman - Final Season Figure', 'mikasa-ackerman-final-season-figure', 'Poseable figure inspired by the final season design with ODM gear details.', 1890000.00, 10, 'active'),
-('Naruto Uzumaki - Sage Mode Figure', 'naruto-uzumaki-sage-mode-figure', 'Collector edition Naruto figure with swirling chakra effect and scenic base.', 2790000.00, 11, 'active');
+('Naruto Uzumaki - Sage Mode Figure', 'naruto-uzumaki-sage-mode-figure', 'Collector edition Naruto figure with swirling chakra effect and scenic base.', 2790000.00, 11, 'active'),
+('Saber Alter - Dress Version Figure', 'saber-alter-dress-version-figure', 'Preorder dress version with glossy finish and premium base.', 3190000.00, 0, 'active'),
+('Gojo Satoru - Awakening Ver. Figure', 'gojo-satoru-awakening-ver-figure', 'Preorder edition with translucent effect parts and dramatic pose.', 3290000.00, 0, 'active'),
+('Eren Yeager - Final Season Figure', 'eren-yeager-final-season-figure', 'Preorder figure inspired by the final season outfit and action pose.', 2190000.00, 0, 'active'),
+('Naruto Uzumaki - Kurama Link Mode Figure', 'naruto-uzumaki-kurama-link-mode-figure', 'Preorder collector figure with Kurama chakra effect base.', 2990000.00, 0, 'active');
 
 INSERT INTO product_images (product_id, image_url, is_main) VALUES
 (1, 'https://via.placeholder.com/640x640?text=Saber+Figure', 1),
@@ -332,7 +381,11 @@ INSERT INTO product_images (product_id, image_url, is_main) VALUES
 (5, 'https://via.placeholder.com/640x640?text=Zoro+Figure', 1),
 (6, 'https://via.placeholder.com/640x640?text=Rem+Figure', 1),
 (7, 'https://via.placeholder.com/640x640?text=Mikasa+Figure', 1),
-(8, 'https://via.placeholder.com/640x640?text=Naruto+Figure', 1);
+(8, 'https://via.placeholder.com/640x640?text=Naruto+Figure', 1),
+(9, 'https://via.placeholder.com/640x640?text=Saber+Alter+Preorder', 1),
+(10, 'https://via.placeholder.com/640x640?text=Gojo+Awakening+Preorder', 1),
+(11, 'https://via.placeholder.com/640x640?text=Eren+Preorder', 1),
+(12, 'https://via.placeholder.com/640x640?text=Naruto+Kurama+Preorder', 1);
 
 -- product_categories: link products to categories
 INSERT INTO product_categories (product_id, category_id) VALUES
@@ -343,7 +396,11 @@ INSERT INTO product_categories (product_id, category_id) VALUES
 (5, 5), -- Zoro -> Statue
 (6, 1), -- Rem -> Scale Figure
 (7, 6), -- Mikasa -> Action Figure
-(8, 7); -- Naruto -> Collector Figure
+(8, 7), -- Naruto -> Collector Figure
+(9, 1), -- Saber Alter -> Scale Figure
+(10, 2), -- Gojo Awakening -> Premium Figure
+(11, 6), -- Eren -> Action Figure
+(12, 7); -- Naruto Kurama -> Collector Figure
 
 -- product_series: link products to series
 INSERT INTO product_series (product_id, series_id) VALUES
@@ -354,7 +411,11 @@ INSERT INTO product_series (product_id, series_id) VALUES
 (5, 5), -- Zoro -> One Piece
 (6, 6), -- Rem -> Re:Zero
 (7, 7), -- Mikasa -> Attack on Titan
-(8, 8); -- Naruto -> Naruto Shippuden
+(8, 8), -- Naruto -> Naruto Shippuden
+(9, 1), -- Saber Alter -> Fate/stay night
+(10, 2), -- Gojo Awakening -> Jujutsu Kaisen
+(11, 7), -- Eren -> Attack on Titan
+(12, 8); -- Naruto Kurama -> Naruto Shippuden
 
 -- product_brands: link products to brands
 INSERT INTO product_brands (product_id, brand_id) VALUES
@@ -365,7 +426,11 @@ INSERT INTO product_brands (product_id, brand_id) VALUES
 (5, 4), -- Zoro -> Bandai Spirits
 (6, 5), -- Rem -> Taito
 (7, 6), -- Mikasa -> Kotobukiya
-(8, 7); -- Naruto -> Megahouse
+(8, 7), -- Naruto -> Megahouse
+(9, 1), -- Saber Alter -> Good Smile Company
+(10, 2), -- Gojo Awakening -> eStream
+(11, 6), -- Eren -> Kotobukiya
+(12, 4); -- Naruto Kurama -> Bandai Spirits
 
 INSERT INTO orders (user_id, address_id, total_amount, status) VALUES
 (2, 1, 3680000.00, 'pending');
