@@ -21,6 +21,7 @@
     "nodemailer": "^6.9.15",
     "pdfkit": "^0.15.0",
     "react-quill": "^2.0.0",
+    "resend": "^6.10.0",
     "xss": "^1.0.15"
   },
   "devDependencies": {

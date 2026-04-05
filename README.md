@@ -93,10 +93,16 @@ DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=figure_shop
-JWT_SECRET=replace_with_a_secure_secret
+JWT_ACCESS_SECRET=replace_with_a_secure_random_string_for_access
+JWT_REFRESH_SECRET=replace_with_a_different_secure_random_string_for_refresh
+EMAIL_PROVIDER=resend
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxx
+RESEND_FROM="KaFigure <onboarding@resend.dev>"
 ```
 
 Neu ban import bang MySQL Workbench voi ket noi `localhost:3306`, hay dat `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` trong `server/.env` giong dung ket noi do.
+
+De gui email quen mat khau bang Resend, dat `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` va `RESEND_FROM` hop le (domain da verify voi Resend).
 
 ### Cai dependency va chay server
 
