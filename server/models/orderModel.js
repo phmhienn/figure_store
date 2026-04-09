@@ -145,29 +145,14 @@ const createWithItems = async ({
   try {
     await connection.beginTransaction();
 
-    // Ensure user has an address — create or reuse
-    let addressId;
-    const [existingAddresses] = await connection.execute(
-      `SELECT address_id FROM addresses WHERE user_id = ? AND is_default = 1 LIMIT 1`,
-      [userId],
+    // Create a dedicated address snapshot for each order so old orders
+    // are not affected when users place future orders with a new address.
+    const [addrResult] = await connection.execute(
+      `INSERT INTO addresses (user_id, receiver_name, phone, address_line, city, country, is_default)
+       VALUES (?, ?, ?, ?, '', '', 0)`,
+      [userId, recipient_name, phone, shipping_address],
     );
-
-    if (existingAddresses.length) {
-      addressId = existingAddresses[0].address_id;
-      // Update the existing default address with new info
-      await connection.execute(
-        `UPDATE addresses SET receiver_name = ?, phone = ?, address_line = ?
-         WHERE address_id = ?`,
-        [recipient_name, phone, shipping_address, addressId],
-      );
-    } else {
-      const [addrResult] = await connection.execute(
-        `INSERT INTO addresses (user_id, receiver_name, phone, address_line, city, country, is_default)
-         VALUES (?, ?, ?, ?, '', '', 1)`,
-        [userId, recipient_name, phone, shipping_address],
-      );
-      addressId = addrResult.insertId;
-    }
+    const addressId = addrResult.insertId;
 
     // Normalize items (merge duplicates)
     const normalizedItems = items.reduce((accumulator, item) => {

@@ -96,7 +96,9 @@ const validateResetPassword = (req, res, next) => {
   const { token, password } = req.body;
 
   if (!token || !password) {
-    return res.status(400).json({ message: "Token and password are required." });
+    return res
+      .status(400)
+      .json({ message: "Token and password are required." });
   }
 
   if (!validatePassword(password)) {

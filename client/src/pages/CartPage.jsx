@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import CartItem from "../components/CartItem";
 import { useAuth } from "../context/AuthContext";
@@ -14,7 +14,21 @@ const defaultShippingForm = {
   shipping_address: "",
 };
 
+const normalizeBuyNowProduct = (product) => {
+  if (!product?.product_id) return null;
+
+  return {
+    product_id: product.product_id,
+    name: product.name,
+    price: Number(product.price),
+    image_url: product.image_url,
+    stock_quantity: Number(product.stock_quantity) || 1,
+    quantity: Math.max(1, Number(product.quantity) || 1),
+  };
+};
+
 function CartPage() {
+  const location = useLocation();
   const { items, cartSubtotal, updateQuantity, removeFromCart, clearCart } =
     useCart();
   const { user, isAuthenticated } = useAuth();
@@ -24,6 +38,22 @@ function CartPage() {
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState(null);
   const [message, setMessage] = useState({ type: "", text: "" });
+  const [buyNowItem, setBuyNowItem] = useState(() =>
+    normalizeBuyNowProduct(location.state?.buyNowProduct),
+  );
+
+  const isBuyNowMode = Boolean(buyNowItem);
+  const checkoutItems = isBuyNowMode ? [buyNowItem] : items;
+  const checkoutSubtotal = isBuyNowMode
+    ? checkoutItems.reduce(
+        (total, item) => total + Number(item.price) * Number(item.quantity),
+        0,
+      )
+    : cartSubtotal;
+
+  useEffect(() => {
+    setBuyNowItem(normalizeBuyNowProduct(location.state?.buyNowProduct));
+  }, [location.key, location.state]);
 
   useEffect(() => {
     if (user) {
@@ -38,7 +68,7 @@ function CartPage() {
 
   // Validate stock quantities against live API data
   useEffect(() => {
-    if (!items.length) return;
+    if (isBuyNowMode || !items.length) return;
     const validate = async () => {
       try {
         const ids = items.map((i) => i.product_id);
@@ -109,8 +139,13 @@ function CartPage() {
       return;
     }
 
-    if (!items.length) {
-      setMessage({ type: "error", text: "Giỏ hàng của bạn đang trống." });
+    if (!checkoutItems.length) {
+      setMessage({
+        type: "error",
+        text: isBuyNowMode
+          ? "Không có sản phẩm để mua ngay."
+          : "Giỏ hàng của bạn đang trống.",
+      });
       return;
     }
 
@@ -118,13 +153,17 @@ function CartPage() {
       setSubmitting(true);
       await orderService.createOrder({
         ...shippingForm,
-        items: items.map((item) => ({
+        items: checkoutItems.map((item) => ({
           product_id: item.product_id,
           quantity: item.quantity,
         })),
       });
 
-      clearCart();
+      if (isBuyNowMode) {
+        setBuyNowItem(null);
+      } else {
+        clearCart();
+      }
       setShippingForm((currentForm) => ({
         ...currentForm,
         shipping_address: "",
@@ -193,21 +232,33 @@ function CartPage() {
 
       <div className="cart-layout">
         <section className="content-panel">
-          <h2>Sản phẩm trong giỏ</h2>
+          <h2>{isBuyNowMode ? "Sản phẩm mua ngay" : "Sản phẩm trong giỏ"}</h2>
 
-          {items.length ? (
+          {isBuyNowMode && (
+            <p>
+              Bạn đang ở chế độ mua ngay. Sản phẩm này không được lưu vào giỏ
+              hàng nếu bạn thoát trang hoặc không đặt hàng.
+            </p>
+          )}
+
+          {checkoutItems.length ? (
             <div className="cart-list">
-              {items.map((item) => (
+              {checkoutItems.map((item) => (
                 <CartItem
                   key={item.product_id}
                   item={item}
                   onQuantityChange={updateQuantity}
                   onRemove={removeFromCart}
+                  readOnly={isBuyNowMode}
                 />
               ))}
             </div>
           ) : (
-            <p>Giỏ hàng đang trống. Hãy quay lại trang chủ để thêm sản phẩm.</p>
+            <p>
+              {isBuyNowMode
+                ? "Không có sản phẩm mua ngay. Hãy quay lại trang sản phẩm để chọn lại."
+                : "Giỏ hàng đang trống. Hãy quay lại trang chủ để thêm sản phẩm."}
+            </p>
           )}
         </section>
 
@@ -262,7 +313,7 @@ function CartPage() {
             <div className="summary-box">
               <div>
                 <span>Tạm tính</span>
-                <strong>{formatCurrency(cartSubtotal)}</strong>
+                <strong>{formatCurrency(checkoutSubtotal)}</strong>
               </div>
               <div>
                 <span>Vận chuyển</span>
@@ -273,7 +324,7 @@ function CartPage() {
             <button
               type="submit"
               className="primary-button"
-              disabled={submitting || !items.length}
+              disabled={submitting || !checkoutItems.length}
             >
               {submitting ? "Đang tạo đơn..." : "Đặt hàng ngay"}
             </button>

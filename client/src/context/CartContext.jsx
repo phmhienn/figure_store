@@ -4,6 +4,11 @@ import { STORAGE_KEYS } from "../constants/storage";
 
 const CartContext = createContext(null);
 
+const dispatchAppToast = (payload) => {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("app-toast", { detail: payload }));
+};
+
 const readStoredCart = () => {
   try {
     return JSON.parse(localStorage.getItem(STORAGE_KEYS.CART) || "[]");
@@ -20,24 +25,49 @@ export function CartProvider({ children }) {
   }, [items]);
 
   const addToCart = (product, quantity = 1) => {
+    const safeQuantity = Math.max(1, Number(quantity) || 1);
+    const productName = product?.name || "Sản phẩm";
+    const existingItem = items.find(
+      (item) => item.product_id === product.product_id,
+    );
+    const effectiveStock = Number(
+      existingItem?.stock_quantity ?? product.stock_quantity,
+    );
+
+    const hasStockLimit = Number.isFinite(effectiveStock) && effectiveStock > 0;
+    const reachedMaxQuantity =
+      !!existingItem &&
+      hasStockLimit &&
+      existingItem.quantity >= effectiveStock;
+
     setItems((currentItems) => {
-      const existingItem = currentItems.find(
+      const currentExistingItem = currentItems.find(
         (item) => item.product_id === product.product_id,
       );
 
-      if (existingItem) {
+      if (currentExistingItem) {
+        const maxQuantity =
+          Number(currentExistingItem.stock_quantity) ||
+          Number(product.stock_quantity) ||
+          currentExistingItem.quantity + safeQuantity;
+
+        const nextQuantity = Math.min(
+          currentExistingItem.quantity + safeQuantity,
+          maxQuantity,
+        );
+
         return currentItems.map((item) =>
           item.product_id === product.product_id
             ? {
                 ...item,
-                quantity: Math.min(
-                  item.quantity + quantity,
-                  item.stock_quantity,
-                ),
+                quantity: nextQuantity,
               }
             : item,
         );
       }
+
+      const stockQuantity = Number(product.stock_quantity) || safeQuantity;
+      const initialQuantity = Math.min(safeQuantity, stockQuantity);
 
       return [
         ...currentItems,
@@ -46,14 +76,25 @@ export function CartProvider({ children }) {
           name: product.name,
           price: Number(product.price),
           image_url: product.image_url,
-          stock_quantity: Number(product.stock_quantity),
-          quantity: Math.min(
-            quantity,
-            Number(product.stock_quantity) || quantity,
-          ),
+          stock_quantity: stockQuantity,
+          quantity: initialQuantity,
         },
       ];
     });
+
+    dispatchAppToast(
+      reachedMaxQuantity
+        ? {
+            type: "error",
+            text: `"${productName}" đã đạt số lượng tối đa trong giỏ hàng.`,
+          }
+        : {
+            type: "success",
+            text: existingItem
+              ? `Đã cập nhật "${productName}" trong giỏ hàng.`
+              : `Đã thêm "${productName}" vào giỏ hàng.`,
+          },
+    );
   };
 
   const updateQuantity = (productId, quantity) => {

@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   IMAGE_FALLBACK,
@@ -18,23 +18,38 @@ function ProductCard({
   stockLabel,
   stockClass,
 }) {
+  const navigate = useNavigate();
   const isInStock = Number(product.stock_quantity) > 0;
-  const fallbackPrimaryLabel = isInStock ? "Thêm giỏ hàng" : "Tạm hết hàng";
+  const fallbackPrimaryLabel = isInStock ? "Mua ngay" : "Tạm hết hàng";
   const resolvedPrimaryLabel = primaryActionLabel || fallbackPrimaryLabel;
+  const handleAddToCart = onAddToCart ? () => onAddToCart(product) : null;
+  const buyNowPayload = {
+    product_id: product.product_id,
+    name: product.name,
+    price: Number(product.price),
+    image_url: product.image_url,
+    stock_quantity: Number(product.stock_quantity),
+    quantity: 1,
+  };
   const handlePrimaryAction =
-    primaryAction || (onAddToCart ? () => onAddToCart(product) : null);
+    primaryAction ||
+    (() => {
+      navigate("/cart", {
+        state: {
+          buyNowProduct: buyNowPayload,
+        },
+      });
+    });
   const isPrimaryDisabled =
     primaryDisabled ?? (!isInStock || !handlePrimaryAction);
+  const isAddToCartDisabled = !isInStock || !handleAddToCart;
   const resolvedSecondaryLabel = secondaryActionLabel || "Xem chi tiết";
   const resolvedSecondaryTo =
     secondaryActionTo || `/products/${product.product_id}`;
 
   return (
     <article className="product-card">
-      <Link
-        to={`/products/${product.product_id}`}
-        className="product-image-wrap"
-      >
+      <div className="product-image-wrap">
         <img
           src={resolveImageUrl(product.image_url)}
           alt={product.name}
@@ -44,7 +59,15 @@ function ProductCard({
             e.currentTarget.onerror = null;
           }}
         />
-      </Link>
+        <div className="product-image-overlay">
+          <Link
+            to={resolvedSecondaryTo}
+            className="ghost-button link-button compact-button image-overlay-button"
+          >
+            {resolvedSecondaryLabel}
+          </Link>
+        </div>
+      </div>
 
       <div className="product-meta-row">
         <span>{formatCategory(product.category)}</span>
@@ -75,12 +98,16 @@ function ProductCard({
         </div>
 
         <div className="product-actions">
-          <Link
-            to={resolvedSecondaryTo}
-            className="ghost-button link-button compact-button"
-          >
-            {resolvedSecondaryLabel}
-          </Link>
+          {onAddToCart && (
+            <button
+              type="button"
+              className="ghost-button link-button compact-button"
+              onClick={handleAddToCart}
+              disabled={isAddToCartDisabled}
+            >
+              Thêm giỏ hàng
+            </button>
+          )}
           <button
             type="button"
             className="primary-button compact-button"
