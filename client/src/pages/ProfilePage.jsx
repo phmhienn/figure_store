@@ -22,6 +22,11 @@ function ProfilePage() {
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [passwordFieldErrors, setPasswordFieldErrors] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [orderCount, setOrderCount] = useState(0);
@@ -108,8 +113,33 @@ function ProfilePage() {
     setPasswordError("");
     setPasswordSuccess("");
 
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
-      setPasswordError("Mật khẩu nhập lại không khớp.");
+    const nextFieldErrors = {
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    };
+
+    if (!passwordData.currentPassword.trim()) {
+      nextFieldErrors.currentPassword = "Vui lòng nhập mật khẩu hiện tại.";
+    }
+
+    if (!passwordData.newPassword.trim()) {
+      nextFieldErrors.newPassword = "Vui lòng nhập mật khẩu mới.";
+    }
+
+    if (!passwordData.confirmPassword.trim()) {
+      nextFieldErrors.confirmPassword = "Vui lòng nhập lại mật khẩu mới.";
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      nextFieldErrors.confirmPassword = "Mật khẩu nhập lại không khớp.";
+    }
+
+    setPasswordFieldErrors(nextFieldErrors);
+
+    if (
+      nextFieldErrors.currentPassword ||
+      nextFieldErrors.newPassword ||
+      nextFieldErrors.confirmPassword
+    ) {
       return;
     }
 
@@ -125,6 +155,11 @@ function ProfilePage() {
         newPassword: "",
         confirmPassword: "",
       });
+      setPasswordFieldErrors({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
     } catch (requestError) {
       setPasswordError(
         requestError.response?.data?.message || "Đổi mật khẩu thất bại.",
@@ -134,9 +169,38 @@ function ProfilePage() {
     }
   };
 
+  const handlePasswordInputChange = (field) => (event) => {
+    const nextValue = event.target.value;
+
+    setPasswordData((current) => ({
+      ...current,
+      [field]: nextValue,
+    }));
+
+    setPasswordError("");
+    setPasswordFieldErrors((current) => {
+      const nextErrors = { ...current };
+
+      if (nextValue.trim()) {
+        nextErrors[field] = "";
+      }
+
+      if (
+        field === "newPassword" &&
+        current.confirmPassword === "Mật khẩu nhập lại không khớp."
+      ) {
+        nextErrors.confirmPassword = "";
+      }
+
+      return nextErrors;
+    });
+  };
+
   if (isBootstrapping) {
     return (
-      <section className="content-panel">Đang tải thông tin tài khoản...</section>
+      <section className="content-panel">
+        Đang tải thông tin tài khoản...
+      </section>
     );
   }
 
@@ -186,10 +250,7 @@ function ProfilePage() {
                       .join(", ") || "Chưa cập nhật"}
                   </strong>
                   <small>
-                    {[
-                      defaultAddress.receiver_name,
-                      defaultAddress.phone,
-                    ]
+                    {[defaultAddress.receiver_name, defaultAddress.phone]
                       .filter(Boolean)
                       .join(" · ")}
                   </small>
@@ -201,7 +262,9 @@ function ProfilePage() {
             <div>
               <p className="eyebrow">Ngày tham gia</p>
               <strong>
-                {user?.created_at ? formatDate(user.created_at) : "Chưa cập nhật"}
+                {user?.created_at
+                  ? formatDate(user.created_at)
+                  : "Chưa cập nhật"}
               </strong>
             </div>
             <div>
@@ -296,20 +359,23 @@ function ProfilePage() {
           <p>Thay đổi mật khẩu đăng nhập để tăng bảo mật.</p>
         </div>
 
-        <form className="stacked-form" onSubmit={handleChangePassword}>
+        <form
+          className="stacked-form"
+          onSubmit={handleChangePassword}
+          noValidate
+        >
           <label>
             Mật khẩu hiện tại
             <input
               type="password"
               value={passwordData.currentPassword}
-              onChange={(event) =>
-                setPasswordData((current) => ({
-                  ...current,
-                  currentPassword: event.target.value,
-                }))
-              }
-              required
+              onChange={handlePasswordInputChange("currentPassword")}
             />
+            {passwordFieldErrors.currentPassword && (
+              <p className="form-error">
+                {passwordFieldErrors.currentPassword}
+              </p>
+            )}
           </label>
 
           <label>
@@ -317,18 +383,15 @@ function ProfilePage() {
             <input
               type="password"
               value={passwordData.newPassword}
-              onChange={(event) =>
-                setPasswordData((current) => ({
-                  ...current,
-                  newPassword: event.target.value,
-                }))
-              }
-              required
+              onChange={handlePasswordInputChange("newPassword")}
               minLength={8}
             />
             <span className="input-hint">
               Ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.
             </span>
+            {passwordFieldErrors.newPassword && (
+              <p className="form-error">{passwordFieldErrors.newPassword}</p>
+            )}
           </label>
 
           <label>
@@ -336,14 +399,13 @@ function ProfilePage() {
             <input
               type="password"
               value={passwordData.confirmPassword}
-              onChange={(event) =>
-                setPasswordData((current) => ({
-                  ...current,
-                  confirmPassword: event.target.value,
-                }))
-              }
-              required
+              onChange={handlePasswordInputChange("confirmPassword")}
             />
+            {passwordFieldErrors.confirmPassword && (
+              <p className="form-error">
+                {passwordFieldErrors.confirmPassword}
+              </p>
+            )}
           </label>
 
           {passwordError && <p className="form-error">{passwordError}</p>}

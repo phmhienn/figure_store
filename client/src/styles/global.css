@@ -2104,6 +2104,27 @@ code {
   line-height: 1.5;
 }
 
+.auth-link-highlight {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.48rem;
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--primary-deep);
+  background: rgba(255, 95, 114, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 95, 114, 0.18);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.auth-link-highlight:hover {
+  color: #ffffff;
+  background: linear-gradient(135deg, #ff6f82 0%, #ff4a62 100%);
+  transform: translateY(-1px);
+}
+
 .pagination-row {
   display: flex;
   align-items: center;

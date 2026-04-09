@@ -8,6 +8,8 @@ function LoginPage() {
   const location = useLocation();
   const { login } = useAuth();
   const [formData, setFormData] = useState({ email: "", password: "" });
+  const [fieldErrors, setFieldErrors] = useState({ email: "", password: "" });
+  const [authError, setAuthError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const navigateTimer = useRef(null);
 
@@ -24,13 +26,61 @@ function LoginPage() {
     window.dispatchEvent(new CustomEvent("app-toast", { detail: payload }));
   };
 
+  const validateForm = () => {
+    const nextFieldErrors = { email: "", password: "" };
+
+    if (!formData.email.trim()) {
+      nextFieldErrors.email = "Vui lòng nhập email.";
+    }
+
+    if (!formData.password.trim()) {
+      nextFieldErrors.password = "Vui lòng nhập mật khẩu.";
+    }
+
+    setFieldErrors(nextFieldErrors);
+    return !nextFieldErrors.email && !nextFieldErrors.password;
+  };
+
+  const handleInputChange = (field) => (event) => {
+    const nextValue = event.target.value;
+
+    setFormData((current) => ({
+      ...current,
+      [field]: nextValue,
+    }));
+
+    setAuthError("");
+    setFieldErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      if (nextValue.trim()) {
+        return {
+          ...current,
+          [field]: "",
+        };
+      }
+
+      return current;
+    });
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     clearTimers();
+    setAuthError("");
+
+    if (!validateForm()) {
+      return;
+    }
 
     try {
       setSubmitting(true);
-      await login(formData);
+      await login({
+        email: formData.email.trim(),
+        password: formData.password,
+      });
       dispatchAppToast({
         type: "success",
         text: "Đăng nhập thành công. Đang chuyển hướng...",
@@ -38,11 +88,8 @@ function LoginPage() {
       navigateTimer.current = setTimeout(() => {
         navigate(redirectPath, { replace: true });
       }, 1200);
-    } catch (requestError) {
-      dispatchAppToast({
-        type: "error",
-        text: requestError.response?.data?.message || "Đăng nhập thất bại.",
-      });
+    } catch (_requestError) {
+      setAuthError("Sai tài khoản hoặc mật khẩu.");
     } finally {
       setSubmitting(false);
     }
@@ -61,20 +108,17 @@ function LoginPage() {
         </p>
       </div>
 
-      <form className="stacked-form" onSubmit={handleSubmit}>
+      <form className="stacked-form" onSubmit={handleSubmit} noValidate>
         <label>
           Email
           <input
             type="email"
             value={formData.email}
-            onChange={(event) =>
-              setFormData((current) => ({
-                ...current,
-                email: event.target.value,
-              }))
-            }
-            required
+            onChange={handleInputChange("email")}
           />
+          {fieldErrors.email && (
+            <p className="form-error">{fieldErrors.email}</p>
+          )}
         </label>
 
         <label>
@@ -82,25 +126,30 @@ function LoginPage() {
           <input
             type="password"
             value={formData.password}
-            onChange={(event) =>
-              setFormData((current) => ({
-                ...current,
-                password: event.target.value,
-              }))
-            }
-            required
+            onChange={handleInputChange("password")}
           />
+          {fieldErrors.password && (
+            <p className="form-error">{fieldErrors.password}</p>
+          )}
         </label>
+
+        {authError && <p className="form-error">{authError}</p>}
 
         <button type="submit" className="primary-button" disabled={submitting}>
           {submitting ? "Đang đăng nhập..." : "Đăng nhập"}
         </button>
 
         <p>
-          Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>
+          Chưa có tài khoản?{" "}
+          <Link className="auth-link-highlight" to="/register">
+            Đăng ký ngay
+          </Link>
         </p>
         <p>
-          Quên mật khẩu? <Link to="/forgot-password">Khôi phục ngay</Link>
+          Quên mật khẩu?{" "}
+          <Link className="auth-link-highlight" to="/forgot-password">
+            Khôi phục ngay
+          </Link>
         </p>
       </form>
     </section>

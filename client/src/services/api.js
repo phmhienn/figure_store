@@ -33,12 +33,23 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Skip refresh logic for auth routes to avoid infinite loops
-    const isAuthRoute = originalRequest.url?.includes("/users/refresh") ||
+    // Skip refresh logic for auth routes so failed login/register flows
+    // can return inline form errors without forcing a full page reload.
+    const isAuthRoute =
+      originalRequest.url?.includes("/users/login") ||
+      originalRequest.url?.includes("/users/register") ||
+      originalRequest.url?.includes("/users/forgot-password") ||
+      originalRequest.url?.includes("/users/verify-otp") ||
+      originalRequest.url?.includes("/users/reset-password") ||
+      originalRequest.url?.includes("/users/refresh") ||
       originalRequest.url?.includes("/users/logout");
 
     // If 401 and not already retrying, try to refresh token
-    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
+    if (
+      error.response?.status === 401 &&
+      !originalRequest._retry &&
+      !isAuthRoute
+    ) {
       originalRequest._retry = true;
 
       // Prevent multiple refresh attempts simultaneously
