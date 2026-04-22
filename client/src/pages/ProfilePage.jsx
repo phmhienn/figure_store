@@ -8,7 +8,6 @@ import { formatDate, formatRole } from "../utils/format";
 function ProfilePage() {
   const { user, updateProfile, changePassword, isBootstrapping } = useAuth();
   const [formData, setFormData] = useState({
-    username: "",
     full_name: "",
     phone: "",
     email: "",
@@ -36,7 +35,6 @@ function ProfilePage() {
   useEffect(() => {
     if (!user) return;
     setFormData({
-      username: user.username || "",
       full_name: user.full_name || "",
       phone: user.phone || "",
       email: user.email || "",
@@ -217,10 +215,6 @@ function ProfilePage() {
           <p className="eyebrow">Tổng quan</p>
           <div className="summary-box profile-summary">
             <div>
-              <p className="eyebrow">Tên đăng nhập</p>
-              <strong>{user?.username || "Chưa cập nhật"}</strong>
-            </div>
-            <div>
               <p className="eyebrow">Họ và tên</p>
               <strong>{user?.full_name || "Chưa cập nhật"}</strong>
             </div>
@@ -283,21 +277,6 @@ function ProfilePage() {
 
       <div className="page-stack">
         <form className="stacked-form" onSubmit={handleSubmit}>
-          <label>
-            Tên đăng nhập
-            <input
-              type="text"
-              value={formData.username}
-              onChange={(event) =>
-                setFormData((current) => ({
-                  ...current,
-                  username: event.target.value,
-                }))
-              }
-              required
-            />
-          </label>
-
           <label>
             Họ và tên
             <input
