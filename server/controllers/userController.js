@@ -10,6 +10,7 @@ const { sendPasswordResetOtpEmail } = require("../services/emailService");
 const {
   validateEmail,
   validatePassword,
+  validatePasswordLengthOnly,
   validatePhone,
   validateUsername,
 } = require("../middlewares/validationMiddleware");
@@ -248,7 +249,9 @@ const resetPassword = async (req, res, next) => {
     const storedToken = await passwordResetTokenModel.findByHash(tokenHash);
 
     if (!storedToken) {
-      return res.status(400).json({ message: "Invalid or expired reset token." });
+      return res
+        .status(400)
+        .json({ message: "Invalid or expired reset token." });
     }
 
     const user = await userModel.findById(storedToken.user_id);
@@ -365,9 +368,7 @@ const updateCurrentUser = async (req, res, next) => {
     if (username && username !== existingUser.username) {
       const existingUsername = await userModel.findByUsername(username);
       if (existingUsername) {
-        return res
-          .status(409)
-          .json({ message: "Tên đăng nhập đã tồn tại." });
+        return res.status(409).json({ message: "Tên đăng nhập đã tồn tại." });
       }
     }
 
@@ -416,15 +417,19 @@ const changePassword = async (req, res, next) => {
 
     const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isMatch) {
-      return res
-        .status(400)
-        .json({ message: "Mật khẩu hiện tại không đúng." });
+      return res.status(400).json({ message: "Mật khẩu hiện tại không đúng." });
     }
 
     if (currentPassword === newPassword) {
       return res
         .status(400)
         .json({ message: "Mật khẩu mới phải khác mật khẩu hiện tại." });
+    }
+
+    if (!validatePasswordLengthOnly(newPassword)) {
+      return res
+        .status(400)
+        .json({ message: "Mật khẩu mới phải có ít nhất 8 ký tự." });
     }
 
     const password_hash = await bcrypt.hash(newPassword, 10);

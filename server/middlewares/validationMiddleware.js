@@ -12,6 +12,10 @@ const validatePassword = (password) => {
   return true;
 };
 
+const validatePasswordLengthOnly = (password) => {
+  return Boolean(password) && password.length >= 8;
+};
+
 const validatePhone = (phone) => {
   const phoneRegex = /^[0-9\s\-\+\(\)]{7,}$/;
   return phoneRegex.test(phone);
@@ -164,10 +168,9 @@ const validateChangePassword = (req, res, next) => {
     });
   }
 
-  if (!validatePassword(newPassword)) {
+  if (!validatePasswordLengthOnly(newPassword)) {
     return res.status(400).json({
-      message:
-        "Mật khẩu mới phải ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.",
+      message: "Mật khẩu mới phải có ít nhất 8 ký tự.",
     });
   }
 
@@ -263,6 +266,7 @@ module.exports = {
   validateNewsPayload,
   validateEmail,
   validatePassword,
+  validatePasswordLengthOnly,
   validatePhone,
   validateUsername,
 };
