@@ -386,9 +386,7 @@ function ProfilePage() {
               onChange={handlePasswordInputChange("newPassword")}
               minLength={8}
             />
-            <span className="input-hint">
-              Ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.
-            </span>
+            <span className="input-hint">Ít nhất 8 ký tự.</span>
             {passwordFieldErrors.newPassword && (
               <p className="form-error">{passwordFieldErrors.newPassword}</p>
             )}
