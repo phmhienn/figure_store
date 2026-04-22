@@ -89,23 +89,63 @@ const sanitizeUser = (user) => ({
   created_at: user.created_at,
 });
 
+const normalizeUsernameSeed = (value) =>
+  String(value || "")
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9_]/g, "")
+    .toLowerCase();
+
+const buildRegisterUsernameCandidate = ({ email, full_name, attempt = 0 }) => {
+  const fullNameSeed = normalizeUsernameSeed(full_name);
+  const emailLocalPart = String(email || "").split("@")[0];
+  const emailSeed = normalizeUsernameSeed(emailLocalPart);
+  const baseSeed = fullNameSeed || emailSeed || "user";
+  const suffix = `${Date.now().toString(36).slice(-4)}${Math.random()
+    .toString(36)
+    .slice(2, 6)}${attempt}`;
+  const maxBaseLength = Math.max(3, 30 - suffix.length - 1);
+  const safeBase = baseSeed.slice(0, maxBaseLength) || "user";
+
+  return `${safeBase}_${suffix}`;
+};
+
+const createUniqueRegisterUsername = async ({ email, full_name }) => {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const candidate = buildRegisterUsernameCandidate({
+      email,
+      full_name,
+      attempt,
+    });
+    const existingUser = await userModel.findByUsername(candidate);
+    if (!existingUser) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Unable to generate a unique username.");
+};
+
 const register = async (req, res, next) => {
   try {
-    const { username, email, password, full_name, phone } = req.body;
+    const { email, password, full_name, phone } = req.body;
+    const cleanEmail = String(email || "").trim();
 
-    const existingEmail = await userModel.findByEmail(email);
-    const existingUsername = await userModel.findByUsername(username);
+    const existingEmail = await userModel.findByEmail(cleanEmail);
 
-    if (existingEmail || existingUsername) {
-      return res
-        .status(409)
-        .json({ message: "Email or username already exists." });
+    if (existingEmail) {
+      return res.status(409).json({ message: "Email already exists." });
     }
+
+    const username = await createUniqueRegisterUsername({
+      email: cleanEmail,
+      full_name,
+    });
 
     const password_hash = await bcrypt.hash(password, 10);
     const user = await userModel.create({
       username,
-      email,
+      email: cleanEmail,
       password_hash,
       full_name,
       phone,
@@ -408,7 +448,7 @@ const getDefaultAddress = async (req, res, next) => {
 const changePassword = async (req, res, next) => {
   try {
     const userId = req.user.userId;
-    const { currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
 
     const user = await userModel.findById(userId);
     if (!user) {
@@ -430,6 +470,10 @@ const changePassword = async (req, res, next) => {
       return res
         .status(400)
         .json({ message: "Mật khẩu mới phải có ít nhất 8 ký tự." });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: "Xác nhận mật khẩu không khớp." });
     }
 
     const password_hash = await bcrypt.hash(newPassword, 10);

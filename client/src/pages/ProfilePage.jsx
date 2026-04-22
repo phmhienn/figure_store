@@ -146,6 +146,7 @@ function ProfilePage() {
       const response = await changePassword({
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword,
+        confirmPassword: passwordData.confirmPassword,
       });
       setPasswordSuccess(response?.message || "Đổi mật khẩu thành công.");
       setPasswordData({

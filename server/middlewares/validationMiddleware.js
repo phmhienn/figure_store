@@ -23,18 +23,12 @@ const validateUsername = (username) => {
 };
 
 const validateRegister = (req, res, next) => {
-  const { username, email, password, full_name, phone } = req.body;
+  const { email, password, full_name, phone } = req.body;
 
-  if (!username || !email || !password) {
+  if (!email || !password) {
     return res
       .status(400)
-      .json({ message: "Username, email and password are required." });
-  }
-
-  if (!validateUsername(username)) {
-    return res
-      .status(400)
-      .json({ message: "Username must be 3-30 alphanumeric characters." });
+      .json({ message: "Email and password are required." });
   }
 
   if (!validateEmail(email)) {
@@ -153,11 +147,18 @@ const validateUpdateProfile = (req, res, next) => {
 };
 
 const validateChangePassword = (req, res, next) => {
-  const { currentPassword, newPassword } = req.body;
+  const { currentPassword, newPassword, confirmPassword } = req.body;
 
-  if (!currentPassword || !newPassword) {
+  if (!currentPassword || !newPassword || !confirmPassword) {
     return res.status(400).json({
-      message: "Mật khẩu hiện tại và mật khẩu mới là bắt buộc.",
+      message:
+        "Mật khẩu hiện tại, mật khẩu mới và xác nhận mật khẩu là bắt buộc.",
+    });
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({
+      message: "Xác nhận mật khẩu không khớp.",
     });
   }
 

@@ -28,10 +28,11 @@ const authService = {
     const { data } = await api.put("/users/me", payload);
     return data;
   },
-  changePassword: async ({ currentPassword, newPassword }) => {
+  changePassword: async ({ currentPassword, newPassword, confirmPassword }) => {
     const { data } = await api.put("/users/me/password", {
       currentPassword,
       newPassword,
+      confirmPassword,
     });
     return data;
   },
