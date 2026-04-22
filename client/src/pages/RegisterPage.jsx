@@ -7,7 +7,6 @@ function RegisterPage() {
   const navigate = useNavigate();
   const { register } = useAuth();
   const [formData, setFormData] = useState({
-    username: "",
     full_name: "",
     phone: "",
     email: "",
@@ -27,13 +26,36 @@ function RegisterPage() {
     window.dispatchEvent(new CustomEvent("app-toast", { detail: payload }));
   };
 
+  const createAutoUsername = ({ full_name, email }) => {
+    const normalizedFullName = String(full_name || "")
+      .trim()
+      .replace(/\s+/g, "_")
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .toLowerCase();
+    const normalizedEmail = String(email || "")
+      .split("@")[0]
+      .replace(/[^a-zA-Z0-9_]/g, "")
+      .toLowerCase();
+    const base = normalizedFullName || normalizedEmail || "user";
+    const suffix = `${Date.now().toString(36).slice(-4)}${Math.random()
+      .toString(36)
+      .slice(2, 6)}`;
+    const safeBase = base.slice(0, 21);
+
+    return `${safeBase}_${suffix}`;
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     clearTimers();
+    const payload = {
+      ...formData,
+      username: createAutoUsername(formData),
+    };
 
     try {
       setSubmitting(true);
-      await register(formData);
+      await register(payload);
       dispatchAppToast({
         type: "success",
         text: "Đăng ký thành công. Đang chuyển hướng...",
@@ -65,21 +87,6 @@ function RegisterPage() {
       </div>
 
       <form className="stacked-form" onSubmit={handleSubmit}>
-        <label>
-          Tên đăng nhập
-          <input
-            type="text"
-            value={formData.username}
-            onChange={(event) =>
-              setFormData((current) => ({
-                ...current,
-                username: event.target.value,
-              }))
-            }
-            required
-          />
-        </label>
-
         <label>
           Họ và tên
           <input
