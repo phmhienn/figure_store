@@ -144,9 +144,7 @@ function RegisterPage() {
             required
             minLength={8}
           />
-          <span className="input-hint">
-            Ít nhất 8 ký tự, gồm chữ hoa, chữ thường và số.
-          </span>
+          <span className="input-hint">Ít nhất 8 ký tự.</span>
         </label>
 
         <button type="submit" className="primary-button" disabled={submitting}>

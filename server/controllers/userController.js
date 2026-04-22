@@ -474,8 +474,7 @@ const createStaffUser = async (req, res, next) => {
 
     if (!validatePassword(password)) {
       return res.status(400).json({
-        message:
-          "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
+        message: "Password must be at least 8 characters.",
       });
     }
 
@@ -525,8 +524,7 @@ const updateUser = async (req, res, next) => {
 
     if (password && !validatePassword(password)) {
       return res.status(400).json({
-        message:
-          "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
+        message: "Password must be at least 8 characters.",
       });
     }
 

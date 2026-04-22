@@ -4,12 +4,7 @@ const validateEmail = (email) => {
 };
 
 const validatePassword = (password) => {
-  // At least 8 characters, one uppercase, one lowercase, one digit
-  if (!password || password.length < 8) return false;
-  if (!/[A-Z]/.test(password)) return false;
-  if (!/[a-z]/.test(password)) return false;
-  if (!/[0-9]/.test(password)) return false;
-  return true;
+  return Boolean(password) && password.length >= 8;
 };
 
 const validatePasswordLengthOnly = (password) => {
@@ -48,8 +43,7 @@ const validateRegister = (req, res, next) => {
 
   if (!validatePassword(password)) {
     return res.status(400).json({
-      message:
-        "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
+      message: "Password must be at least 8 characters.",
     });
   }
 
@@ -107,8 +101,7 @@ const validateResetPassword = (req, res, next) => {
 
   if (!validatePassword(password)) {
     return res.status(400).json({
-      message:
-        "Password must be at least 8 characters and include an uppercase letter, a lowercase letter, and a number.",
+      message: "Password must be at least 8 characters.",
     });
   }
 
