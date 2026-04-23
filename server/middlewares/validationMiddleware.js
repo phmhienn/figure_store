@@ -48,6 +48,12 @@ const validateRegister = (req, res, next) => {
     });
   }
 
+  if (!String(full_name || "").trim()) {
+    return res.status(400).json({
+      message: "Họ và tên là bắt buộc.",
+    });
+  }
+
   if (phone && !validatePhone(phone)) {
     return res.status(400).json({
       message: "Số điện thoại phải bắt đầu bằng số 0 và chỉ gồm chữ số.",
@@ -58,11 +64,14 @@ const validateRegister = (req, res, next) => {
     req.body.phone = normalizePhone(phone);
   }
 
-  if (full_name && (full_name.length < 2 || full_name.length > 100)) {
+  const normalizedFullName = String(full_name || "").trim();
+  if (normalizedFullName.length < 2 || normalizedFullName.length > 100) {
     return res
       .status(400)
-      .json({ message: "Full name must be 2-100 characters." });
+      .json({ message: "Họ và tên phải có độ dài 2-100 ký tự." });
   }
+
+  req.body.full_name = normalizedFullName;
 
   next();
 };
@@ -168,22 +177,9 @@ const validateUpdateProfile = (req, res, next) => {
 const validateChangePassword = (req, res, next) => {
   const { currentPassword, newPassword, confirmPassword } = req.body;
 
-  if (!currentPassword || !newPassword || !confirmPassword) {
+  if (!currentPassword) {
     return res.status(400).json({
-      message:
-        "Mật khẩu hiện tại, mật khẩu mới và xác nhận mật khẩu là bắt buộc.",
-    });
-  }
-
-  if (newPassword !== confirmPassword) {
-    return res.status(400).json({
-      message: "Xác nhận mật khẩu không khớp.",
-    });
-  }
-
-  if (!validatePasswordLengthOnly(newPassword)) {
-    return res.status(400).json({
-      message: "Mật khẩu mới phải có ít nhất 8 ký tự.",
+      message: "Mật khẩu hiện tại là bắt buộc.",
     });
   }
 

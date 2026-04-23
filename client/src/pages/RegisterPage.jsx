@@ -51,8 +51,15 @@ function RegisterPage() {
     clearTimers();
     setFormError("");
 
+    const normalizedFullName = String(formData.full_name || "").trim();
+    if (!normalizedFullName) {
+      setFormError("Vui lòng nhập họ và tên.");
+      return;
+    }
+
     const payload = {
       ...formData,
+      full_name: normalizedFullName,
       username: createAutoUsername(formData),
     };
 
@@ -104,6 +111,7 @@ function RegisterPage() {
                 full_name: event.target.value,
               }))
             }
+            required
           />
         </label>
 

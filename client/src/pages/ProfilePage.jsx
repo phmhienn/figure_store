@@ -119,6 +119,8 @@ function ProfilePage() {
 
     if (!passwordData.currentPassword.trim()) {
       nextFieldErrors.currentPassword = "Vui lòng nhập mật khẩu hiện tại.";
+      setPasswordFieldErrors(nextFieldErrors);
+      return;
     }
 
     if (!passwordData.newPassword.trim()) {
@@ -133,11 +135,7 @@ function ProfilePage() {
 
     setPasswordFieldErrors(nextFieldErrors);
 
-    if (
-      nextFieldErrors.currentPassword ||
-      nextFieldErrors.newPassword ||
-      nextFieldErrors.confirmPassword
-    ) {
+    if (nextFieldErrors.newPassword || nextFieldErrors.confirmPassword) {
       return;
     }
 

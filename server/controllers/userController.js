@@ -136,7 +136,12 @@ const register = async (req, res, next) => {
   try {
     const { email, password, full_name, phone } = req.body;
     const cleanEmail = String(email || "").trim();
+    const cleanFullName = String(full_name || "").trim();
     const cleanPhone = phone ? normalizeOptionalPhone(phone) : null;
+
+    if (!cleanFullName) {
+      return res.status(400).json({ message: "Họ và tên là bắt buộc." });
+    }
 
     const existingEmail = await userModel.findByEmail(cleanEmail);
 
@@ -153,7 +158,7 @@ const register = async (req, res, next) => {
 
     const username = await createUniqueRegisterUsername({
       email: cleanEmail,
-      full_name,
+      full_name: cleanFullName,
     });
 
     const password_hash = await bcrypt.hash(password, 10);
@@ -161,7 +166,7 @@ const register = async (req, res, next) => {
       username,
       email: cleanEmail,
       password_hash,
-      full_name,
+      full_name: cleanFullName,
       phone: cleanPhone,
       role: "customer",
     });
@@ -486,6 +491,12 @@ const changePassword = async (req, res, next) => {
     const isMatch = await bcrypt.compare(currentPassword, user.password_hash);
     if (!isMatch) {
       return res.status(400).json({ message: "Mật khẩu hiện tại không đúng." });
+    }
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({
+        message: "Mật khẩu mới và xác nhận mật khẩu là bắt buộc.",
+      });
     }
 
     if (currentPassword === newPassword) {
