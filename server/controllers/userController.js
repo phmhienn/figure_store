@@ -11,6 +11,7 @@ const {
   validateEmail,
   validatePassword,
   validatePasswordLengthOnly,
+  normalizePhone,
   validatePhone,
   validateUsername,
 } = require("../middlewares/validationMiddleware");
@@ -89,6 +90,11 @@ const sanitizeUser = (user) => ({
   created_at: user.created_at,
 });
 
+const normalizeOptionalPhone = (phone) => {
+  const normalizedPhone = normalizePhone(phone);
+  return normalizedPhone || null;
+};
+
 const normalizeUsernameSeed = (value) =>
   String(value || "")
     .trim()
@@ -130,11 +136,19 @@ const register = async (req, res, next) => {
   try {
     const { email, password, full_name, phone } = req.body;
     const cleanEmail = String(email || "").trim();
+    const cleanPhone = phone ? normalizeOptionalPhone(phone) : null;
 
     const existingEmail = await userModel.findByEmail(cleanEmail);
 
     if (existingEmail) {
       return res.status(409).json({ message: "Email already exists." });
+    }
+
+    if (cleanPhone) {
+      const existingPhone = await userModel.findByPhone(cleanPhone);
+      if (existingPhone) {
+        return res.status(409).json({ message: "Số điện thoại đã tồn tại." });
+      }
     }
 
     const username = await createUniqueRegisterUsername({
@@ -148,7 +162,7 @@ const register = async (req, res, next) => {
       email: cleanEmail,
       password_hash,
       full_name,
-      phone,
+      phone: cleanPhone,
       role: "customer",
     });
 
@@ -395,8 +409,15 @@ const updateCurrentUser = async (req, res, next) => {
   try {
     const userId = req.user.userId;
     const { username, email, full_name, phone } = req.body;
+    const hasPhoneField = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "phone",
+    );
+    const cleanPhone = hasPhoneField
+      ? normalizeOptionalPhone(phone)
+      : undefined;
 
-    if (!username && !email && !full_name && !phone) {
+    if (!username && !email && !full_name && !hasPhoneField) {
       return res.status(400).json({ message: "Không có thay đổi nào." });
     }
 
@@ -419,11 +440,18 @@ const updateCurrentUser = async (req, res, next) => {
       }
     }
 
+    if (hasPhoneField && cleanPhone && cleanPhone !== existingUser.phone) {
+      const existingPhone = await userModel.findByPhone(cleanPhone);
+      if (existingPhone && existingPhone.user_id !== userId) {
+        return res.status(409).json({ message: "Số điện thoại đã tồn tại." });
+      }
+    }
+
     const updatedUser = await userModel.update(userId, {
       username,
       email,
       full_name,
-      phone,
+      phone: cleanPhone,
     });
 
     return res.json({
@@ -499,6 +527,7 @@ const createStaffUser = async (req, res, next) => {
   try {
     const { username, email, password, full_name, phone, role } = req.body;
     const normalizedRole = role === "admin" ? "admin" : "staff";
+    const cleanPhone = phone ? normalizeOptionalPhone(phone) : null;
 
     if (!username || !email || !password) {
       return res
@@ -523,16 +552,21 @@ const createStaffUser = async (req, res, next) => {
     }
 
     if (phone && !validatePhone(phone)) {
-      return res.status(400).json({ message: "Invalid phone format." });
+      return res.status(400).json({
+        message: "Phone must start with 0 and contain digits only.",
+      });
     }
 
     const existingEmail = await userModel.findByEmail(email);
     const existingUsername = await userModel.findByUsername(username);
+    const existingPhone = cleanPhone
+      ? await userModel.findByPhone(cleanPhone)
+      : null;
 
-    if (existingEmail || existingUsername) {
-      return res
-        .status(409)
-        .json({ message: "Email or username already exists." });
+    if (existingEmail || existingUsername || existingPhone) {
+      return res.status(409).json({
+        message: "Email, username or phone already exists.",
+      });
     }
 
     const password_hash = await bcrypt.hash(password, 10);
@@ -541,7 +575,7 @@ const createStaffUser = async (req, res, next) => {
       email,
       password_hash,
       full_name,
-      phone,
+      phone: cleanPhone,
       role: normalizedRole,
     });
 
@@ -555,6 +589,13 @@ const updateUser = async (req, res, next) => {
   try {
     const userId = Number(req.params.id);
     const { username, email, password, full_name, phone, role } = req.body;
+    const hasPhoneField = Object.prototype.hasOwnProperty.call(
+      req.body,
+      "phone",
+    );
+    const cleanPhone = hasPhoneField
+      ? normalizeOptionalPhone(phone)
+      : undefined;
 
     if (username && !validateUsername(username)) {
       return res
@@ -573,7 +614,18 @@ const updateUser = async (req, res, next) => {
     }
 
     if (phone && !validatePhone(phone)) {
-      return res.status(400).json({ message: "Invalid phone format." });
+      return res.status(400).json({
+        message: "Phone must start with 0 and contain digits only.",
+      });
+    }
+
+    if (cleanPhone) {
+      const existingPhone = await userModel.findByPhone(cleanPhone);
+      if (existingPhone && existingPhone.user_id !== userId) {
+        return res
+          .status(409)
+          .json({ message: "Phone number already exists." });
+      }
     }
 
     if (role && !["admin", "staff", "customer"].includes(role)) {
@@ -584,7 +636,7 @@ const updateUser = async (req, res, next) => {
       username,
       email,
       full_name,
-      phone,
+      phone: cleanPhone,
       role,
     };
 

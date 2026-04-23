@@ -13,6 +13,7 @@ function RegisterPage() {
     password: "",
   });
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
   const navigateTimer = useRef(null);
 
   const clearTimers = () => {
@@ -48,6 +49,8 @@ function RegisterPage() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     clearTimers();
+    setFormError("");
+
     const payload = {
       ...formData,
       username: createAutoUsername(formData),
@@ -64,9 +67,12 @@ function RegisterPage() {
         navigate("/", { replace: true });
       }, 1200);
     } catch (requestError) {
+      const message =
+        requestError.response?.data?.message || "Đăng ký thất bại.";
+      setFormError(message);
       dispatchAppToast({
         type: "error",
-        text: requestError.response?.data?.message || "Đăng ký thất bại.",
+        text: message,
       });
     } finally {
       setSubmitting(false);
@@ -113,6 +119,9 @@ function RegisterPage() {
               }))
             }
           />
+          <span className="input-hint">
+            Số điện thoại phải bắt đầu bằng số 0.
+          </span>
         </label>
 
         <label>
@@ -146,6 +155,8 @@ function RegisterPage() {
           />
           <span className="input-hint">Ít nhất 8 ký tự.</span>
         </label>
+
+        {formError && <p className="form-error">{formError}</p>}
 
         <button type="submit" className="primary-button" disabled={submitting}>
           {submitting ? "Đang tạo tài khoản..." : "Tạo tài khoản"}

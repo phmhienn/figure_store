@@ -1,4 +1,4 @@
-const pool = require('../config/db');
+const pool = require("../config/db");
 
 const USER_COLUMNS = `
   username,
@@ -15,7 +15,9 @@ const baseSelect = `
 `;
 
 const findAll = async () => {
-  const [rows] = await pool.execute(`${baseSelect} ORDER BY created_at DESC, user_id DESC`);
+  const [rows] = await pool.execute(
+    `${baseSelect} ORDER BY created_at DESC, user_id DESC`,
+  );
   return rows;
 };
 
@@ -30,7 +32,14 @@ const findByEmail = async (email) => {
 };
 
 const findByUsername = async (username) => {
-  const [rows] = await pool.execute(`${baseSelect} WHERE username = ?`, [username]);
+  const [rows] = await pool.execute(`${baseSelect} WHERE username = ?`, [
+    username,
+  ]);
+  return rows[0] || null;
+};
+
+const findByPhone = async (phone) => {
+  const [rows] = await pool.execute(`${baseSelect} WHERE phone = ?`, [phone]);
   return rows[0] || null;
 };
 
@@ -41,12 +50,12 @@ const create = async (userData) => {
     userData.password_hash,
     userData.full_name || null,
     userData.phone || null,
-    userData.role || 'customer',
+    userData.role || "customer",
   ];
 
   const [result] = await pool.execute(
     `INSERT INTO users (${USER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`,
-    values
+    values,
   );
 
   return findById(result.insertId);
@@ -82,14 +91,16 @@ const update = async (id, userData) => {
       payload.phone,
       payload.role,
       id,
-    ]
+    ],
   );
 
   return findById(id);
 };
 
 const deleteUser = async (id) => {
-  const [result] = await pool.execute('DELETE FROM users WHERE user_id = ?', [id]);
+  const [result] = await pool.execute("DELETE FROM users WHERE user_id = ?", [
+    id,
+  ]);
   return result.affectedRows > 0;
 };
 
@@ -98,8 +109,8 @@ module.exports = {
   findById,
   findByEmail,
   findByUsername,
+  findByPhone,
   create,
   update,
   delete: deleteUser,
 };
-

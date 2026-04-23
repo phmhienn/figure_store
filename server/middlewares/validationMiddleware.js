@@ -11,9 +11,16 @@ const validatePasswordLengthOnly = (password) => {
   return Boolean(password) && password.length >= 8;
 };
 
+const normalizePhone = (phone) => {
+  return String(phone || "")
+    .trim()
+    .replace(/\D/g, "");
+};
+
 const validatePhone = (phone) => {
-  const phoneRegex = /^[0-9\s\-\+\(\)]{7,}$/;
-  return phoneRegex.test(phone);
+  const normalizedPhone = normalizePhone(phone);
+  const phoneRegex = /^0\d{8,10}$/;
+  return phoneRegex.test(normalizedPhone);
 };
 
 const validateUsername = (username) => {
@@ -42,7 +49,13 @@ const validateRegister = (req, res, next) => {
   }
 
   if (phone && !validatePhone(phone)) {
-    return res.status(400).json({ message: "Invalid phone format." });
+    return res.status(400).json({
+      message: "Số điện thoại phải bắt đầu bằng số 0 và chỉ gồm chữ số.",
+    });
+  }
+
+  if (phone) {
+    req.body.phone = normalizePhone(phone);
   }
 
   if (full_name && (full_name.length < 2 || full_name.length > 100)) {
@@ -134,7 +147,13 @@ const validateUpdateProfile = (req, res, next) => {
   }
 
   if (phone && !validatePhone(phone)) {
-    return res.status(400).json({ message: "Số điện thoại không hợp lệ." });
+    return res.status(400).json({
+      message: "Số điện thoại phải bắt đầu bằng số 0 và chỉ gồm chữ số.",
+    });
+  }
+
+  if (phone) {
+    req.body.phone = normalizePhone(phone);
   }
 
   if (full_name && (full_name.length < 2 || full_name.length > 100)) {
@@ -261,6 +280,7 @@ module.exports = {
   validateEmail,
   validatePassword,
   validatePasswordLengthOnly,
+  normalizePhone,
   validatePhone,
   validateUsername,
 };

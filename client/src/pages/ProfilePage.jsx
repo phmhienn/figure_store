@@ -304,6 +304,9 @@ function ProfilePage() {
                 }))
               }
             />
+            <span className="input-hint">
+              Số điện thoại phải bắt đầu bằng số 0.
+            </span>
           </label>
 
           <label>
