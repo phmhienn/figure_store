@@ -123,21 +123,7 @@ function ProfilePage() {
       return;
     }
 
-    if (!passwordData.newPassword.trim()) {
-      nextFieldErrors.newPassword = "Vui lòng nhập mật khẩu mới.";
-    }
-
-    if (!passwordData.confirmPassword.trim()) {
-      nextFieldErrors.confirmPassword = "Vui lòng nhập lại mật khẩu mới.";
-    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
-      nextFieldErrors.confirmPassword = "Mật khẩu nhập lại không khớp.";
-    }
-
     setPasswordFieldErrors(nextFieldErrors);
-
-    if (nextFieldErrors.newPassword || nextFieldErrors.confirmPassword) {
-      return;
-    }
 
     try {
       setPasswordSubmitting(true);
@@ -180,13 +166,6 @@ function ProfilePage() {
 
       if (nextValue.trim()) {
         nextErrors[field] = "";
-      }
-
-      if (
-        field === "newPassword" &&
-        current.confirmPassword === "Mật khẩu nhập lại không khớp."
-      ) {
-        nextErrors.confirmPassword = "";
       }
 
       return nextErrors;
