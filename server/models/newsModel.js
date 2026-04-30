@@ -22,10 +22,15 @@ const getUniqueSlug = async (baseSlug, excludeId = null) => {
   let suffix = 2;
 
   while (true) {
-    const [rows] = await pool.execute(
-      `SELECT news_id FROM news_posts WHERE slug = ?${excludeId ? " AND news_id <> ?" : ""} LIMIT 1`,
-      excludeId ? [candidate, excludeId] : [candidate],
-    );
+    const params = [candidate];
+    let query = "SELECT news_id FROM news_posts WHERE slug = $1";
+    if (excludeId) {
+      params.push(excludeId);
+      query += " AND news_id <> $2";
+    }
+    query += " LIMIT 1";
+
+    const { rows } = await pool.query(query, params);
 
     if (!rows.length) {
       return candidate;
@@ -40,12 +45,14 @@ const findAll = async ({ status, search } = {}) => {
   const params = [];
 
   if (status) {
-    whereClauses.push("n.status = ?");
+    whereClauses.push("n.status = $" + (params.length + 1));
     params.push(status);
   }
 
   if (search) {
-    whereClauses.push("(n.title LIKE ? OR n.excerpt LIKE ?)");
+    whereClauses.push(
+      `(n.title ILIKE $${params.length + 1} OR n.excerpt ILIKE $${params.length + 2})`,
+    );
     params.push(`%${search}%`, `%${search}%`);
   }
 
@@ -53,7 +60,7 @@ const findAll = async ({ status, search } = {}) => {
     ? `WHERE ${whereClauses.join(" AND ")}`
     : "";
 
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `${baseSelect} ${whereClause} ORDER BY n.created_at DESC, n.news_id DESC`,
     params,
   );
@@ -62,15 +69,17 @@ const findAll = async ({ status, search } = {}) => {
 };
 
 const findPublished = async ({ search } = {}) => {
-  const whereClauses = ["n.status = ?", "n.published_at IS NOT NULL"];
+  const whereClauses = ["n.status = $1", "n.published_at IS NOT NULL"];
   const params = ["published"];
 
   if (search) {
-    whereClauses.push("(n.title LIKE ? OR n.excerpt LIKE ?)");
+    whereClauses.push(
+      `(n.title ILIKE $${params.length + 1} OR n.excerpt ILIKE $${params.length + 2})`,
+    );
     params.push(`%${search}%`, `%${search}%`);
   }
 
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `${baseSelect} WHERE ${whereClauses.join(" AND ")}
      ORDER BY n.published_at DESC, n.news_id DESC`,
     params,
@@ -80,7 +89,7 @@ const findPublished = async ({ search } = {}) => {
 };
 
 const findById = async (id) => {
-  const [rows] = await pool.execute(`${baseSelect} WHERE n.news_id = ?`, [id]);
+  const { rows } = await pool.query(`${baseSelect} WHERE n.news_id = $1`, [id]);
   return rows[0] || null;
 };
 
@@ -94,11 +103,12 @@ const create = async (payload) => {
   const slug = await getUniqueSlug(slugBase);
   const publishedAt = status === "published" ? new Date() : null;
 
-  const [result] = await pool.execute(
+  const { rows } = await pool.query(
     `
       INSERT INTO news_posts
         (title, slug, excerpt, content, cover_image_url, status, author_id, published_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING news_id
     `,
     [
       title,
@@ -112,7 +122,7 @@ const create = async (payload) => {
     ],
   );
 
-  return findById(result.insertId);
+  return rows[0]?.news_id ? findById(rows[0].news_id) : null;
 };
 
 const update = async (id, payload) => {
@@ -153,12 +163,12 @@ const update = async (id, payload) => {
   const nextCoverImage =
     payload.cover_image_url?.trim() ?? existing.cover_image_url;
 
-  await pool.execute(
+  await pool.query(
     `
       UPDATE news_posts
-      SET title = ?, slug = ?, excerpt = ?, content = ?, cover_image_url = ?,
-          status = ?, published_at = ?
-      WHERE news_id = ?
+      SET title = $1, slug = $2, excerpt = $3, content = $4, cover_image_url = $5,
+          status = $6, published_at = $7
+      WHERE news_id = $8
     `,
     [
       nextTitle,
@@ -176,11 +186,10 @@ const update = async (id, payload) => {
 };
 
 const remove = async (id) => {
-  const [result] = await pool.execute(
-    "DELETE FROM news_posts WHERE news_id = ?",
-    [id],
-  );
-  return result.affectedRows > 0;
+  const result = await pool.query("DELETE FROM news_posts WHERE news_id = $1", [
+    id,
+  ]);
+  return result.rowCount > 0;
 };
 
 module.exports = {

@@ -1,26 +1,27 @@
-const mysql = require("mysql2/promise");
+const { Pool, types } = require("pg");
 const dotenv = require("dotenv");
 
 dotenv.config({ path: __dirname + "/../.env" });
 
-const pool = mysql.createPool({
+// Match mysql2 decimalNumbers behavior by parsing NUMERIC to Number.
+types.setTypeParser(1700, (value) => (value === null ? null : Number(value)));
+
+const pool = new Pool({
   host: process.env.DB_HOST || "localhost",
-  port: Number(process.env.DB_PORT || 3306),
-  user: process.env.DB_USER || "root",
+  port: Number(process.env.DB_PORT || 5432),
+  user: process.env.DB_USER || "postgres",
   password: process.env.DB_PASSWORD || "",
   database: process.env.DB_NAME || "figure_shop",
-  charset: "utf8mb4",
-  decimalNumbers: true,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
 });
 
 const testConnection = async () => {
-  const connection = await pool.getConnection();
+  const connection = await pool.connect();
 
   try {
-    await connection.ping();
+    await connection.query("SELECT 1");
   } finally {
     connection.release();
   }

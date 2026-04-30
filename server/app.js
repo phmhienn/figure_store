@@ -106,19 +106,19 @@ const createServer = (port, basePort = port) =>
   });
 
 const getDatabaseErrorMessage = (error) => {
-  if (error.code === "ER_ACCESS_DENIED_ERROR") {
-    return "Không thể đăng nhập MySQL. Hãy kiểm tra DB_USER và DB_PASSWORD trong server/.env.";
+  if (error.code === "28P01") {
+    return "Không thể đăng nhập PostgreSQL. Hãy kiểm tra DB_USER và DB_PASSWORD trong server/.env.";
   }
 
-  if (error.code === "ER_BAD_DB_ERROR") {
-    return "Database figure_shop chưa tồn tại. Hãy mở database.sql bằng MySQL Workbench và chạy file này trước.";
+  if (error.code === "3D000") {
+    return "Database figure_shop chưa tồn tại. Hãy tạo database PostgreSQL và chạy file database.sql trước.";
   }
 
   if (error.code === "ECONNREFUSED") {
-    return "Không kết nối được MySQL Server. Hãy mở MySQL Workbench/XAMPP/MySQL Service và kiểm tra DB_HOST, DB_PORT.";
+    return "Không kết nối được PostgreSQL Server. Hãy kiểm tra DB_HOST, DB_PORT và service PostgreSQL.";
   }
 
-  return `Lỗi kết nối MySQL: ${error.message}`;
+  return `Lỗi kết nối PostgreSQL: ${error.message}`;
 };
 
 const bootstrap = async () => {

@@ -1,7 +1,7 @@
 const pool = require("../config/db");
 
 const findAll = async () => {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `
       SELECT o.*, u.username, u.email,
              a.receiver_name, a.phone AS address_phone,
@@ -16,7 +16,7 @@ const findAll = async () => {
 };
 
 const findAllWithItems = async () => {
-  const [orders] = await pool.execute(
+  const { rows: orders } = await pool.query(
     `
       SELECT o.*, u.username, u.email,
              a.receiver_name, a.phone AS address_phone,
@@ -33,15 +33,14 @@ const findAllWithItems = async () => {
   }
 
   const orderIds = orders.map((order) => order.order_id);
-  const placeholders = orderIds.map(() => "?").join(", ");
 
-  const [items] = await pool.execute(
+  const { rows: items } = await pool.query(
     `
       SELECT oi.*, p.name AS product_name,
         COALESCE(
           (
             SELECT pi.image_url FROM product_images pi
-            WHERE pi.product_id = p.product_id AND pi.is_main = 1
+            WHERE pi.product_id = p.product_id AND pi.is_main = TRUE
             ORDER BY pi.image_id ASC LIMIT 1
           ),
           (
@@ -52,10 +51,10 @@ const findAllWithItems = async () => {
         ) AS image_url
       FROM order_items oi
       JOIN products p ON p.product_id = oi.product_id
-      WHERE oi.order_id IN (${placeholders})
+      WHERE oi.order_id = ANY($1)
       ORDER BY oi.order_item_id ASC
     `,
-    orderIds,
+    [orderIds],
   );
 
   const itemMap = items.reduce((accumulator, item) => {
@@ -78,14 +77,14 @@ const findAllWithItems = async () => {
 };
 
 const findById = async (id) => {
-  const [orderRows] = await pool.execute(
+  const { rows: orderRows } = await pool.query(
     `
       SELECT o.*,
              a.receiver_name, a.phone AS address_phone,
              a.address_line, a.city, a.country
       FROM orders o
       LEFT JOIN addresses a ON a.address_id = o.address_id
-      WHERE o.order_id = ?
+      WHERE o.order_id = $1
     `,
     [id],
   );
@@ -95,13 +94,13 @@ const findById = async (id) => {
     return null;
   }
 
-  const [itemRows] = await pool.execute(
+  const { rows: itemRows } = await pool.query(
     `
       SELECT oi.*, p.name AS product_name,
         COALESCE(
           (
             SELECT pi.image_url FROM product_images pi
-            WHERE pi.product_id = p.product_id AND pi.is_main = 1
+            WHERE pi.product_id = p.product_id AND pi.is_main = TRUE
             ORDER BY pi.image_id ASC LIMIT 1
           ),
           (
@@ -112,7 +111,7 @@ const findById = async (id) => {
         ) AS image_url
       FROM order_items oi
       JOIN products p ON p.product_id = oi.product_id
-      WHERE oi.order_id = ?
+      WHERE oi.order_id = $1
       ORDER BY oi.order_item_id ASC
     `,
     [id],
@@ -125,12 +124,12 @@ const findById = async (id) => {
 };
 
 const updateStatus = async (id, status) => {
-  const [result] = await pool.execute(
-    "UPDATE orders SET status = ? WHERE order_id = ?",
+  const result = await pool.query(
+    "UPDATE orders SET status = $1 WHERE order_id = $2",
     [status, id],
   );
 
-  return result.affectedRows > 0;
+  return result.rowCount > 0;
 };
 
 const createWithItems = async ({
@@ -140,19 +139,20 @@ const createWithItems = async ({
   shipping_address,
   items,
 }) => {
-  const connection = await pool.getConnection();
+  const connection = await pool.connect();
 
   try {
-    await connection.beginTransaction();
+    await connection.query("BEGIN");
 
     // Create a dedicated address snapshot for each order so old orders
     // are not affected when users place future orders with a new address.
-    const [addrResult] = await connection.execute(
+    const { rows: addrRows } = await connection.query(
       `INSERT INTO addresses (user_id, receiver_name, phone, address_line, city, country, is_default)
-       VALUES (?, ?, ?, ?, '', '', 0)`,
+       VALUES ($1, $2, $3, $4, '', '', FALSE)
+       RETURNING address_id`,
       [userId, recipient_name, phone, shipping_address],
     );
-    const addressId = addrResult.insertId;
+    const addressId = addrRows[0].address_id;
 
     // Normalize items (merge duplicates)
     const normalizedItems = items.reduce((accumulator, item) => {
@@ -177,16 +177,15 @@ const createWithItems = async ({
     }, []);
 
     const productIds = normalizedItems.map((item) => item.product_id);
-    const placeholders = productIds.map(() => "?").join(", ");
 
-    const [products] = await connection.execute(
+    const { rows: products } = await connection.query(
       `
         SELECT product_id, name, price, stock_quantity
         FROM products
-        WHERE product_id IN (${placeholders})
+        WHERE product_id = ANY($1)
         FOR UPDATE
       `,
-      productIds,
+      [productIds],
     );
 
     if (products.length !== productIds.length) {
@@ -210,40 +209,37 @@ const createWithItems = async ({
       totalAmount += Number(product.price) * item.quantity;
     }
 
-    const [orderResult] = await connection.execute(
+    const { rows: orderRows } = await connection.query(
       `
         INSERT INTO orders (user_id, address_id, total_amount, status)
-        VALUES (?, ?, ?, 'pending')
+        VALUES ($1, $2, $3, 'pending')
+        RETURNING order_id
       `,
       [userId, addressId, totalAmount],
     );
+    const orderId = orderRows[0].order_id;
 
     for (const item of normalizedItems) {
       const product = productMap.get(item.product_id);
 
-      await connection.execute(
+      await connection.query(
         `
           INSERT INTO order_items (order_id, product_id, quantity, price)
-          VALUES (?, ?, ?, ?)
+          VALUES ($1, $2, $3, $4)
         `,
-        [
-          orderResult.insertId,
-          product.product_id,
-          item.quantity,
-          product.price,
-        ],
+        [orderId, product.product_id, item.quantity, product.price],
       );
 
-      await connection.execute(
-        "UPDATE products SET stock_quantity = stock_quantity - ? WHERE product_id = ?",
+      await connection.query(
+        "UPDATE products SET stock_quantity = stock_quantity - $1 WHERE product_id = $2",
         [item.quantity, product.product_id],
       );
     }
 
-    await connection.commit();
-    return findById(orderResult.insertId);
+    await connection.query("COMMIT");
+    return findById(orderId);
   } catch (error) {
-    await connection.rollback();
+    await connection.query("ROLLBACK");
     throw error;
   } finally {
     connection.release();
@@ -251,14 +247,14 @@ const createWithItems = async ({
 };
 
 const findOrdersByUser = async (userId) => {
-  const [orders] = await pool.execute(
+  const { rows: orders } = await pool.query(
     `
       SELECT o.*,
              a.receiver_name, a.phone AS address_phone,
              a.address_line, a.city, a.country
       FROM orders o
       LEFT JOIN addresses a ON a.address_id = o.address_id
-      WHERE o.user_id = ?
+      WHERE o.user_id = $1
       ORDER BY o.created_at DESC, o.order_id DESC
     `,
     [userId],
@@ -269,15 +265,14 @@ const findOrdersByUser = async (userId) => {
   }
 
   const orderIds = orders.map((order) => order.order_id);
-  const placeholders = orderIds.map(() => "?").join(", ");
 
-  const [items] = await pool.execute(
+  const { rows: items } = await pool.query(
     `
       SELECT oi.*, p.name AS product_name,
         COALESCE(
           (
             SELECT pi.image_url FROM product_images pi
-            WHERE pi.product_id = p.product_id AND pi.is_main = 1
+            WHERE pi.product_id = p.product_id AND pi.is_main = TRUE
             ORDER BY pi.image_id ASC LIMIT 1
           ),
           (
@@ -288,10 +283,10 @@ const findOrdersByUser = async (userId) => {
         ) AS image_url
       FROM order_items oi
       JOIN products p ON p.product_id = oi.product_id
-      WHERE oi.order_id IN (${placeholders})
+      WHERE oi.order_id = ANY($1)
       ORDER BY oi.order_item_id ASC
     `,
-    orderIds,
+    [orderIds],
   );
 
   const itemMap = items.reduce((accumulator, item) => {

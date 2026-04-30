@@ -1,16 +1,16 @@
 const pool = require("../config/db");
 
 // ── Schema auto-detection ────────────────────────────────────────────
-// 'normalized'     → new schema: product_images, categories, series, brands tables
-// 'flat-with-slug' → legacy flat schema but with slug column on products
-// 'flat'           → original flat schema (no slug, no junction tables)
+// 'normalized'     -> new schema: product_images, categories, series, brands tables
+// 'flat-with-slug' -> legacy flat schema but with slug column on products
+// 'flat'           -> original flat schema (no slug, no junction tables)
 let _schemaMode = null;
 
 const detectSchema = async () => {
   if (_schemaMode) return _schemaMode;
 
   try {
-    await pool.execute("SELECT 1 FROM product_images LIMIT 1");
+    await pool.query("SELECT 1 FROM product_images LIMIT 1");
     _schemaMode = "normalized";
     return _schemaMode;
   } catch (_e) {
@@ -18,7 +18,7 @@ const detectSchema = async () => {
   }
 
   try {
-    await pool.execute("SELECT slug FROM products LIMIT 1");
+    await pool.query("SELECT slug FROM products LIMIT 1");
     _schemaMode = "flat-with-slug";
   } catch (_e) {
     _schemaMode = "flat";
@@ -35,7 +35,7 @@ const NORM_SELECT = `
     p.description, p.price, p.stock_quantity,
     p.view_count, p.release_date, p.status, p.created_at,
     COALESCE(
-      (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.product_id AND pi.is_main = 1 ORDER BY pi.image_id ASC LIMIT 1),
+      (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.product_id AND pi.is_main = TRUE ORDER BY pi.image_id ASC LIMIT 1),
       (SELECT pi.image_url FROM product_images pi WHERE pi.product_id = p.product_id ORDER BY pi.image_id ASC LIMIT 1)
     ) AS image_url,
     (SELECT c.name FROM categories c JOIN product_categories pc ON pc.category_id = c.category_id WHERE pc.product_id = p.product_id LIMIT 1) AS category,
@@ -69,7 +69,7 @@ const getSelect = async () => {
 
 const findAll = async () => {
   const SELECT = await getSelect();
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `${SELECT} ORDER BY p.created_at DESC, p.product_id DESC`,
   );
   return rows;
@@ -90,8 +90,14 @@ const findPaginated = async ({
         ? FLAT_SLUG_SELECT
         : FLAT_SELECT;
 
-  const whereClauses = ["p.status = ?"];
-  const params = ["active"];
+  const whereClauses = [];
+  const params = [];
+  const addParam = (value) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  whereClauses.push(`p.status = ${addParam("active")}`);
 
   if (inStockOnly) {
     whereClauses.push("p.stock_quantity > 0");
@@ -102,32 +108,37 @@ const findPaginated = async ({
       whereClauses.push(`EXISTS (
         SELECT 1 FROM product_categories pc
         JOIN categories c ON c.category_id = pc.category_id
-        WHERE pc.product_id = p.product_id AND c.name = ?
+        WHERE pc.product_id = p.product_id AND c.name = ${addParam(category)}
       )`);
     } else {
-      whereClauses.push("p.category = ?");
+      whereClauses.push(`p.category = ${addParam(category)}`);
     }
-    params.push(category);
   }
 
   if (search) {
-    whereClauses.push("(p.name LIKE ? OR p.description LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`);
+    const term = `%${search}%`;
+    whereClauses.push(
+      `(p.name ILIKE ${addParam(term)} OR p.description ILIKE ${addParam(term)})`,
+    );
   }
 
   const whereClause = whereClauses.join(" AND ");
 
-  const [countResult] = await pool.execute(
-    `SELECT COUNT(*) as total FROM products p WHERE ${whereClause}`,
-    params,
+  const countParams = [...params];
+  const { rows: countRows } = await pool.query(
+    `SELECT COUNT(*) AS total FROM products p WHERE ${whereClause}`,
+    countParams,
   );
-  const total = countResult[0].total;
+  const total = Number(countRows[0]?.total || 0);
   const offset = (page - 1) * limit;
 
-  const [rows] = await pool.execute(
+  const limitPlaceholder = addParam(Number(limit));
+  const offsetPlaceholder = addParam(Number(offset));
+
+  const { rows } = await pool.query(
     `${SELECT} WHERE ${whereClause}
      ORDER BY p.created_at DESC, p.product_id DESC
-     LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+     LIMIT ${limitPlaceholder} OFFSET ${offsetPlaceholder}`,
     params,
   );
 
@@ -139,16 +150,16 @@ const findPaginated = async ({
 
 const findById = async (id) => {
   const SELECT = await getSelect();
-  const [rows] = await pool.execute(`${SELECT} WHERE p.product_id = ?`, [id]);
+  const { rows } = await pool.query(`${SELECT} WHERE p.product_id = $1`, [id]);
   return rows[0] || null;
 };
 
 const incrementViewCount = async (id) => {
-  const [result] = await pool.execute(
-    "UPDATE products SET view_count = COALESCE(view_count, 0) + 1 WHERE product_id = ?",
+  const result = await pool.query(
+    "UPDATE products SET view_count = COALESCE(view_count, 0) + 1 WHERE product_id = $1",
     [id],
   );
-  return result.affectedRows > 0;
+  return result.rowCount > 0;
 };
 
 // ── Write helpers ────────────────────────────────────────────────────
@@ -162,15 +173,16 @@ const slugify = (value) =>
     .replace(/(^-|-$)/g, "");
 
 const findOrCreateLookup = async (conn, table, idCol, name) => {
-  const [rows] = await conn.execute(
-    `SELECT ${idCol} FROM ${table} WHERE name = ?`,
+  const { rows } = await conn.query(
+    `SELECT ${idCol} FROM ${table} WHERE name = $1`,
     [name],
   );
   if (rows.length) return rows[0][idCol];
-  const [res] = await conn.execute(`INSERT INTO ${table} (name) VALUES (?)`, [
-    name,
-  ]);
-  return res.insertId;
+  const { rows: insertRows } = await conn.query(
+    `INSERT INTO ${table} (name) VALUES ($1) RETURNING ${idCol}`,
+    [name],
+  );
+  return insertRows[0][idCol];
 };
 
 // ── Create ───────────────────────────────────────────────────────────
@@ -211,23 +223,24 @@ const create = async (productData) => {
       productData.status === "inactive" ? "inactive" : "active",
     ];
 
-    const placeholders = vals.map(() => "?").join(", ");
-    const [result] = await pool.execute(
-      `INSERT INTO products (${cols}) VALUES (${placeholders})`,
+    const placeholders = vals.map((_, index) => `$${index + 1}`).join(", ");
+    const { rows } = await pool.query(
+      `INSERT INTO products (${cols}) VALUES (${placeholders}) RETURNING product_id`,
       vals,
     );
-    return findById(result.insertId);
+    return rows[0]?.product_id ? findById(rows[0].product_id) : null;
   }
 
   // normalized schema
-  const connection = await pool.getConnection();
+  const connection = await pool.connect();
   try {
-    await connection.beginTransaction();
+    await connection.query("BEGIN");
 
     const slug = productData.slug?.trim() || slugify(productData.name || "");
-    const [result] = await connection.execute(
+    const { rows: productRows } = await connection.query(
       `INSERT INTO products (name, slug, description, price, stock_quantity, status)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING product_id`,
       [
         productData.name,
         slug,
@@ -237,11 +250,11 @@ const create = async (productData) => {
         productData.status === "inactive" ? "inactive" : "active",
       ],
     );
-    const productId = result.insertId;
+    const productId = productRows[0].product_id;
 
     if (productData.image_url) {
-      await connection.execute(
-        `INSERT INTO product_images (product_id, image_url, is_main) VALUES (?, ?, 1)`,
+      await connection.query(
+        `INSERT INTO product_images (product_id, image_url, is_main) VALUES ($1, $2, TRUE)`,
         [productId, productData.image_url],
       );
     }
@@ -252,8 +265,8 @@ const create = async (productData) => {
         "category_id",
         productData.category,
       );
-      await connection.execute(
-        `INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)`,
+      await connection.query(
+        `INSERT INTO product_categories (product_id, category_id) VALUES ($1, $2)`,
         [productId, cid],
       );
     }
@@ -264,8 +277,8 @@ const create = async (productData) => {
         "series_id",
         productData.series,
       );
-      await connection.execute(
-        `INSERT INTO product_series (product_id, series_id) VALUES (?, ?)`,
+      await connection.query(
+        `INSERT INTO product_series (product_id, series_id) VALUES ($1, $2)`,
         [productId, sid],
       );
     }
@@ -276,16 +289,16 @@ const create = async (productData) => {
         "brand_id",
         productData.brand,
       );
-      await connection.execute(
-        `INSERT INTO product_brands (product_id, brand_id) VALUES (?, ?)`,
+      await connection.query(
+        `INSERT INTO product_brands (product_id, brand_id) VALUES ($1, $2)`,
         [productId, bid],
       );
     }
 
-    await connection.commit();
+    await connection.query("COMMIT");
     return findById(productId);
   } catch (error) {
-    await connection.rollback();
+    await connection.query("ROLLBACK");
     throw error;
   } finally {
     connection.release();
@@ -303,50 +316,45 @@ const update = async (id, productData) => {
       ? productData.slug?.trim() || slugify(productData.name || "")
       : null;
 
-    const setCols = [
-      "name = ?",
-      ...(hasSlug ? ["slug = ?"] : []),
-      "description = ?",
-      "price = ?",
-      "stock_quantity = ?",
-      "image_url = ?",
-      "category = ?",
-      "series = ?",
-      "brand = ?",
-      "status = ?",
-    ].join(", ");
+    const setParts = [];
+    const values = [];
+    const add = (column, value) => {
+      values.push(value);
+      setParts.push(`${column} = $${values.length}`);
+    };
 
-    const vals = [
-      productData.name,
-      ...(hasSlug ? [slug] : []),
-      productData.description || "",
-      productData.price,
-      productData.stock_quantity ?? 0,
-      productData.image_url || "",
-      productData.category || "",
-      productData.series || "",
-      productData.brand || "",
-      productData.status === "inactive" ? "inactive" : "active",
-      id,
-    ];
+    add("name", productData.name);
+    if (hasSlug) {
+      add("slug", slug);
+    }
+    add("description", productData.description || "");
+    add("price", productData.price);
+    add("stock_quantity", productData.stock_quantity ?? 0);
+    add("image_url", productData.image_url || "");
+    add("category", productData.category || "");
+    add("series", productData.series || "");
+    add("brand", productData.brand || "");
+    add("status", productData.status === "inactive" ? "inactive" : "active");
 
-    const [result] = await pool.execute(
-      `UPDATE products SET ${setCols} WHERE product_id = ?`,
-      vals,
+    values.push(id);
+    const idPlaceholder = `$${values.length}`;
+    const result = await pool.query(
+      `UPDATE products SET ${setParts.join(", ")} WHERE product_id = ${idPlaceholder}`,
+      values,
     );
-    if (!result.affectedRows) return null;
+    if (!result.rowCount) return null;
     return findById(id);
   }
 
   // normalized schema
-  const connection = await pool.getConnection();
+  const connection = await pool.connect();
   try {
-    await connection.beginTransaction();
+    await connection.query("BEGIN");
 
     const slug = productData.slug?.trim() || slugify(productData.name || "");
-    const [result] = await connection.execute(
-      `UPDATE products SET name = ?, slug = ?, description = ?, price = ?, stock_quantity = ?, status = ?
-       WHERE product_id = ?`,
+    const result = await connection.query(
+      `UPDATE products SET name = $1, slug = $2, description = $3, price = $4, stock_quantity = $5, status = $6
+       WHERE product_id = $7`,
       [
         productData.name,
         slug,
@@ -357,24 +365,24 @@ const update = async (id, productData) => {
         id,
       ],
     );
-    if (!result.affectedRows) {
-      await connection.rollback();
+    if (!result.rowCount) {
+      await connection.query("ROLLBACK");
       return null;
     }
 
     if (productData.image_url) {
-      await connection.execute(
-        `DELETE FROM product_images WHERE product_id = ? AND is_main = 1`,
+      await connection.query(
+        `DELETE FROM product_images WHERE product_id = $1 AND is_main = TRUE`,
         [id],
       );
-      await connection.execute(
-        `INSERT INTO product_images (product_id, image_url, is_main) VALUES (?, ?, 1)`,
+      await connection.query(
+        `INSERT INTO product_images (product_id, image_url, is_main) VALUES ($1, $2, TRUE)`,
         [id, productData.image_url],
       );
     }
 
-    await connection.execute(
-      `DELETE FROM product_categories WHERE product_id = ?`,
+    await connection.query(
+      `DELETE FROM product_categories WHERE product_id = $1`,
       [id],
     );
     if (productData.category) {
@@ -384,16 +392,15 @@ const update = async (id, productData) => {
         "category_id",
         productData.category,
       );
-      await connection.execute(
-        `INSERT INTO product_categories (product_id, category_id) VALUES (?, ?)`,
+      await connection.query(
+        `INSERT INTO product_categories (product_id, category_id) VALUES ($1, $2)`,
         [id, cid],
       );
     }
 
-    await connection.execute(
-      `DELETE FROM product_series WHERE product_id = ?`,
-      [id],
-    );
+    await connection.query(`DELETE FROM product_series WHERE product_id = $1`, [
+      id,
+    ]);
     if (productData.series) {
       const sid = await findOrCreateLookup(
         connection,
@@ -401,16 +408,15 @@ const update = async (id, productData) => {
         "series_id",
         productData.series,
       );
-      await connection.execute(
-        `INSERT INTO product_series (product_id, series_id) VALUES (?, ?)`,
+      await connection.query(
+        `INSERT INTO product_series (product_id, series_id) VALUES ($1, $2)`,
         [id, sid],
       );
     }
 
-    await connection.execute(
-      `DELETE FROM product_brands WHERE product_id = ?`,
-      [id],
-    );
+    await connection.query(`DELETE FROM product_brands WHERE product_id = $1`, [
+      id,
+    ]);
     if (productData.brand) {
       const bid = await findOrCreateLookup(
         connection,
@@ -418,16 +424,16 @@ const update = async (id, productData) => {
         "brand_id",
         productData.brand,
       );
-      await connection.execute(
-        `INSERT INTO product_brands (product_id, brand_id) VALUES (?, ?)`,
+      await connection.query(
+        `INSERT INTO product_brands (product_id, brand_id) VALUES ($1, $2)`,
         [id, bid],
       );
     }
 
-    await connection.commit();
+    await connection.query("COMMIT");
     return findById(id);
   } catch (error) {
-    await connection.rollback();
+    await connection.query("ROLLBACK");
     throw error;
   } finally {
     connection.release();
@@ -437,11 +443,11 @@ const update = async (id, productData) => {
 // ── Delete ───────────────────────────────────────────────────────────
 
 const deleteProduct = async (id) => {
-  const [result] = await pool.execute(
-    "DELETE FROM products WHERE product_id = ?",
+  const result = await pool.query(
+    "DELETE FROM products WHERE product_id = $1",
     [id],
   );
-  return result.affectedRows > 0;
+  return result.rowCount > 0;
 };
 
 module.exports = {

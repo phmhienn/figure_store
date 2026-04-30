@@ -1,56 +1,68 @@
 const pool = require("../config/db");
 
 const GROUP_FORMATS = {
-  day: "%Y-%m-%d",
-  month: "%Y-%m",
-  year: "%Y",
+  day: "YYYY-MM-DD",
+  month: "YYYY-MM",
+  year: "YYYY",
 };
 
-const buildStatusFilter = (statuses) => {
+const buildStatusFilter = (statuses, addParam) => {
   const safeStatuses =
     Array.isArray(statuses) && statuses.length ? statuses : ["completed"];
-  const placeholders = safeStatuses.map(() => "?").join(", ");
-  return {
-    clause: `o.status IN (${placeholders})`,
-    values: safeStatuses,
-  };
+  const placeholders = safeStatuses
+    .map((status) => addParam(status))
+    .join(", ");
+  return `o.status IN (${placeholders})`;
 };
 
 const getRevenueSeries = async ({ group, from, to, statuses }) => {
   const format = GROUP_FORMATS[group] || GROUP_FORMATS.day;
-  const statusFilter = buildStatusFilter(statuses);
+  const params = [];
+  const addParam = (value) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  const formatParam = addParam(format);
+  const statusClause = buildStatusFilter(statuses, addParam);
+  const fromParam = addParam(from);
+  const toParam = addParam(to);
   const includePreorders =
     Array.isArray(statuses) && statuses.includes("completed");
 
   if (includePreorders) {
-    const [rows] = await pool.execute(
+    const preorderFormatParam = addParam(format);
+    const preorderFromParam = addParam(from);
+    const preorderToParam = addParam(to);
+
+    const { rows } = await pool.query(
       `
         SELECT period,
                SUM(total_revenue) AS total_revenue,
                SUM(order_count) AS order_count
         FROM (
-          SELECT DATE_FORMAT(o.created_at, ?) AS period,
+          SELECT TO_CHAR(o.created_at, ${formatParam}) AS period,
                  SUM(o.total_amount) AS total_revenue,
                  COUNT(*) AS order_count
           FROM orders o
-          WHERE ${statusFilter.clause}
-            AND o.created_at BETWEEN ? AND ?
+          WHERE ${statusClause}
+            AND o.created_at BETWEEN ${fromParam} AND ${toParam}
           GROUP BY period
 
           UNION ALL
 
-          SELECT DATE_FORMAT(p.updated_at, ?) AS period,
+          SELECT TO_CHAR(p.updated_at, ${preorderFormatParam}) AS period,
                  SUM(p.price_at_order * p.quantity) AS total_revenue,
                  COUNT(*) AS order_count
           FROM preorders p
           WHERE p.status = 'completed'
-            AND p.updated_at BETWEEN ? AND ?
+            AND p.updated_at BETWEEN ${preorderFromParam} AND ${preorderToParam}
           GROUP BY period
         ) summary
         GROUP BY period
         ORDER BY period
       `,
-      [format, ...statusFilter.values, from, to, format, from, to],
+      params,
     );
 
     return rows.map((row) => ({
@@ -60,18 +72,18 @@ const getRevenueSeries = async ({ group, from, to, statuses }) => {
     }));
   }
 
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `
-      SELECT DATE_FORMAT(o.created_at, ?) AS period,
+      SELECT TO_CHAR(o.created_at, ${formatParam}) AS period,
              SUM(o.total_amount) AS total_revenue,
              COUNT(*) AS order_count
       FROM orders o
-      WHERE ${statusFilter.clause}
-        AND o.created_at BETWEEN ? AND ?
+      WHERE ${statusClause}
+        AND o.created_at BETWEEN ${fromParam} AND ${toParam}
       GROUP BY period
       ORDER BY period
     `,
-    [format, ...statusFilter.values, from, to],
+    params,
   );
 
   return rows.map((row) => ({
@@ -82,8 +94,17 @@ const getRevenueSeries = async ({ group, from, to, statuses }) => {
 };
 
 const getTopProducts = async ({ from, to, limit, statuses }) => {
-  const statusFilter = buildStatusFilter(statuses);
-  const [rows] = await pool.execute(
+  const params = [];
+  const addParam = (value) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+  const statusClause = buildStatusFilter(statuses, addParam);
+  const fromParam = addParam(from);
+  const toParam = addParam(to);
+  const limitParam = addParam(limit);
+
+  const { rows } = await pool.query(
     `
       SELECT p.product_id,
              p.name,
@@ -92,7 +113,7 @@ const getTopProducts = async ({ from, to, limit, statuses }) => {
              COALESCE(
                (
                  SELECT pi.image_url FROM product_images pi
-                 WHERE pi.product_id = p.product_id AND pi.is_main = 1
+                 WHERE pi.product_id = p.product_id AND pi.is_main = TRUE
                  ORDER BY pi.image_id ASC LIMIT 1
                ),
                (
@@ -104,13 +125,13 @@ const getTopProducts = async ({ from, to, limit, statuses }) => {
       FROM order_items oi
       JOIN orders o ON o.order_id = oi.order_id
       JOIN products p ON p.product_id = oi.product_id
-      WHERE ${statusFilter.clause}
-        AND o.created_at BETWEEN ? AND ?
+      WHERE ${statusClause}
+        AND o.created_at BETWEEN ${fromParam} AND ${toParam}
       GROUP BY p.product_id, p.name
       ORDER BY total_quantity DESC, total_revenue DESC
-      LIMIT ?
+      LIMIT ${limitParam}
     `,
-    [...statusFilter.values, from, to, limit],
+    params,
   );
 
   return rows.map((row) => ({
@@ -123,12 +144,12 @@ const getTopProducts = async ({ from, to, limit, statuses }) => {
 };
 
 const getInventorySummary = async ({ lowStock }) => {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `
       SELECT COUNT(*) AS total_products,
              SUM(stock_quantity) AS total_stock,
-             SUM(stock_quantity <= 0) AS out_of_stock,
-             SUM(stock_quantity <= ?) AS low_stock
+             SUM(CASE WHEN stock_quantity <= 0 THEN 1 ELSE 0 END) AS out_of_stock,
+             SUM(CASE WHEN stock_quantity <= $1 THEN 1 ELSE 0 END) AS low_stock
       FROM products
     `,
     [lowStock],
@@ -144,7 +165,7 @@ const getInventorySummary = async ({ lowStock }) => {
 };
 
 const getInventoryItems = async () => {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `
       SELECT p.product_id,
              p.name,
@@ -157,7 +178,7 @@ const getInventoryItems = async () => {
              COALESCE(
                (
                  SELECT pi.image_url FROM product_images pi
-                 WHERE pi.product_id = p.product_id AND pi.is_main = 1
+                 WHERE pi.product_id = p.product_id AND pi.is_main = TRUE
                  ORDER BY pi.image_id ASC LIMIT 1
                ),
                (

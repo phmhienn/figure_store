@@ -4,11 +4,11 @@ Website ban mo hinh Anime Figure duoc xay dung voi:
 
 - Frontend: React + Vite
 - Backend: Node.js + Express
-- Database: MySQL
+- Database: PostgreSQL
 - Backend architecture: MVC (Model - View - Controller)
 - API style: RESTful
 
-MySQL Workbench chi la cong cu quan tri. Ung dung nay da duoc chuan hoa de ket noi truc tiep toi MySQL Server va import schema bang MySQL Workbench.
+pgAdmin chi la cong cu quan tri. Ung dung nay da duoc chuan hoa de ket noi truc tiep toi PostgreSQL Server va import schema bang psql/pgAdmin.
 
 ## 1. Cau truc project
 
@@ -39,9 +39,9 @@ webmohinh/
 `-- README.md
 ```
 
-## 2. Database MySQL
+## 2. Database PostgreSQL
 
-File [database.sql](D:/DocumentByPH/webmohinh/database.sql) da duoc chuan hoa sang cu phap MySQL va gom:
+File [database.sql](D:/DocumentByPH/webmohinh/database.sql) da duoc chuan hoa sang cu phap PostgreSQL va gom:
 
 - `CREATE DATABASE figure_shop`
 - `CREATE TABLE users`
@@ -50,29 +50,29 @@ File [database.sql](D:/DocumentByPH/webmohinh/database.sql) da duoc chuan hoa sa
 - `CREATE TABLE order_items`
 - du lieu mau cho users, products, orders
 
-### Cach import `database.sql` vao MySQL
+### Cach import `database.sql` vao PostgreSQL
 
-Cach 1: MySQL CLI
+Cach 1: psql CLI
 
 1. Mo terminal.
-2. Dang nhap MySQL:
+2. Dang nhap psql:
 
 ```bash
-mysql -u root -p
+psql -U postgres -d postgres
 ```
 
-3. Trong MySQL shell, chay:
+3. Trong psql shell, chay:
 
 ```sql
-source D:/DocumentByPH/webmohinh/database.sql;
+\i D:/DocumentByPH/webmohinh/database.sql
 ```
 
-Cach 2: MySQL Workbench
+Cach 2: pgAdmin
 
-1. Mo MySQL Workbench.
-2. Chon `File` -> `Open SQL Script...`.
-3. Mo file [database.sql](D:/DocumentByPH/webmohinh/database.sql).
-4. Bam `Execute` de tao database va seed du lieu.
+1. Mo pgAdmin va ket noi PostgreSQL server.
+2. Tao database `figure_shop` neu chua co.
+3. Mo `Query Tool` cua database `figure_shop`.
+4. Mo file [database.sql](D:/DocumentByPH/webmohinh/database.sql). Neu pgAdmin bao loi o dong `\connect`, hay xoa 3 dong dau (DROP/CREATE/\connect) truoc khi chay.
 
 ### Tai khoan mau sau khi import
 
@@ -83,15 +83,15 @@ Cach 2: MySQL Workbench
 
 ### Tao file env
 
-Copy file [server/.env.example](D:/DocumentByPH/webmohinh/server/.env.example) thanh `server/.env` va cap nhat thong tin MySQL:
+Copy file [server/.env.example](D:/DocumentByPH/webmohinh/server/.env.example) thanh `server/.env` va cap nhat thong tin PostgreSQL:
 
 ```env
 PORT=5000
 CLIENT_URL=http://localhost:5173
 DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=your_mysql_password
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=your_postgres_password
 DB_NAME=figure_shop
 JWT_ACCESS_SECRET=replace_with_a_secure_random_string_for_access
 JWT_REFRESH_SECRET=replace_with_a_different_secure_random_string_for_refresh
@@ -100,7 +100,7 @@ RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxx
 RESEND_FROM="KaFigure <onboarding@resend.dev>"
 ```
 
-Neu ban import bang MySQL Workbench voi ket noi `localhost:3306`, hay dat `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` trong `server/.env` giong dung ket noi do.
+Neu ban ket noi Postgres voi `localhost:5432`, hay dat `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` trong `server/.env` giong dung ket noi do.
 
 De gui email quen mat khau bang Resend, dat `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` va `RESEND_FROM` hop le (domain da verify voi Resend).
 
@@ -167,15 +167,15 @@ Frontend se chay tai `http://localhost:5173`.
 
 ## 6. Ghi chu ky thuat
 
-- Backend dung `mysql2/promise` va viet SQL truc tiep trong model.
+- Backend dung `pg` va viet SQL truc tiep trong model.
 - `orderModel.createWithItems()` dung transaction de tranh sai lech ton kho khi dat hang.
 - Frontend dung Axios interceptor de gan JWT vao request tu dong.
 - Gio hang duoc luu trong `localStorage`.
-- Khi khoi dong, backend se kiem tra ket noi MySQL truoc va bao loi ro neu sai tai khoan, sai port, hoac chua import schema.
+- Khi khoi dong, backend se kiem tra ket noi PostgreSQL truoc va bao loi ro neu sai tai khoan, sai port, hoac chua import schema.
 
 ## 7. Thu tu khoi dong de test nhanh
 
-1. Import [database.sql](D:/DocumentByPH/webmohinh/database.sql) vao MySQL Workbench.
+1. Import [database.sql](D:/DocumentByPH/webmohinh/database.sql) vao PostgreSQL (psql/pgAdmin).
 2. Chay backend trong thu muc `server`.
 3. Chay frontend trong thu muc `client`.
 4. Vao trang login bang tai khoan admin neu muon test CRUD san pham.

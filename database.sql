@@ -1,34 +1,36 @@
--- Figure Shop schema for MySQL
--- Converted from SQL Server syntax. Run this in MySQL Workbench or MySQL CLI.
+-- Figure Shop schema for PostgreSQL
+-- Run this in psql or pgAdmin.
+-- pgAdmin note: remove the DROP/CREATE/\connect lines and run while connected
+-- to the figure_shop database.
 
 DROP DATABASE IF EXISTS figure_shop;
-CREATE DATABASE figure_shop CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE figure_shop;
+CREATE DATABASE figure_shop;
+\connect figure_shop;
 
 -- ============================================================
 -- Users & Addresses
 -- ============================================================
 
 CREATE TABLE users (
-    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     email VARCHAR(100) UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     full_name VARCHAR(100),
     phone VARCHAR(20),
     role VARCHAR(20) NOT NULL DEFAULT 'customer',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE addresses (
-    address_id INT AUTO_INCREMENT PRIMARY KEY,
+    address_id SERIAL PRIMARY KEY,
     user_id INT,
     receiver_name VARCHAR(100),
     phone VARCHAR(20),
     address_line TEXT,
     city VARCHAR(100),
     country VARCHAR(100),
-    is_default TINYINT(1) DEFAULT 0,
+    is_default BOOLEAN DEFAULT FALSE,
 
     CONSTRAINT FK_addresses_users
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
@@ -39,7 +41,7 @@ CREATE TABLE addresses (
 -- ============================================================
 
 CREATE TABLE products (
-    product_id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) UNIQUE,
     description TEXT,
@@ -48,20 +50,20 @@ CREATE TABLE products (
     view_count INT DEFAULT 0,
     release_date DATE,
     status VARCHAR(20) DEFAULT 'active',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE product_images (
-    image_id INT AUTO_INCREMENT PRIMARY KEY,
+    image_id SERIAL PRIMARY KEY,
     product_id INT,
     image_url TEXT,
-    is_main TINYINT(1) DEFAULT 0,
+    is_main BOOLEAN DEFAULT FALSE,
 
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
 );
 
 CREATE TABLE categories (
-    category_id INT AUTO_INCREMENT PRIMARY KEY,
+    category_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     parent_id INT,
 
@@ -78,7 +80,7 @@ CREATE TABLE product_categories (
 );
 
 CREATE TABLE series (
-    series_id INT AUTO_INCREMENT PRIMARY KEY,
+    series_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL
 );
 
@@ -92,7 +94,7 @@ CREATE TABLE product_series (
 );
 
 CREATE TABLE brands (
-    brand_id INT AUTO_INCREMENT PRIMARY KEY,
+    brand_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL
 );
 
@@ -106,7 +108,7 @@ CREATE TABLE product_brands (
 );
 
 CREATE TABLE product_variants (
-    variant_id INT AUTO_INCREMENT PRIMARY KEY,
+    variant_id SERIAL PRIMARY KEY,
     product_id INT,
     size VARCHAR(50),
     color VARCHAR(50),
@@ -120,17 +122,17 @@ CREATE TABLE product_variants (
 -- ============================================================
 
 CREATE TABLE news_posts (
-    news_id INT AUTO_INCREMENT PRIMARY KEY,
+    news_id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     slug VARCHAR(255) UNIQUE,
     excerpt TEXT,
-    content LONGTEXT,
+    content TEXT,
     cover_image_url TEXT,
     status VARCHAR(20) DEFAULT 'draft',
     author_id INT,
-    published_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    published_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (author_id) REFERENCES users(user_id) ON DELETE SET NULL
 );
@@ -140,15 +142,15 @@ CREATE TABLE news_posts (
 -- ============================================================
 
 CREATE TABLE carts (
-    cart_id INT AUTO_INCREMENT PRIMARY KEY,
+    cart_id SERIAL PRIMARY KEY,
     user_id INT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
 CREATE TABLE cart_items (
-    cart_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    cart_item_id SERIAL PRIMARY KEY,
     cart_id INT,
     product_id INT,
     quantity INT NOT NULL CHECK (quantity > 0),
@@ -162,19 +164,19 @@ CREATE TABLE cart_items (
 -- ============================================================
 
 CREATE TABLE orders (
-    order_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id SERIAL PRIMARY KEY,
     user_id INT,
     address_id INT,
     total_amount DECIMAL(10,2),
     status VARCHAR(20) DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (address_id) REFERENCES addresses(address_id)
 );
 
 CREATE TABLE order_items (
-    order_item_id INT AUTO_INCREMENT PRIMARY KEY,
+    order_item_id SERIAL PRIMARY KEY,
     order_id INT,
     product_id INT,
     quantity INT NOT NULL,
@@ -185,23 +187,23 @@ CREATE TABLE order_items (
 );
 
 CREATE TABLE payments (
-    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id SERIAL PRIMARY KEY,
     order_id INT,
     method VARCHAR(50),
     status VARCHAR(20),
-    paid_at DATETIME,
+    paid_at TIMESTAMP,
 
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
 );
 
 CREATE TABLE shipping (
-    shipping_id INT AUTO_INCREMENT PRIMARY KEY,
+    shipping_id SERIAL PRIMARY KEY,
     order_id INT,
     tracking_number VARCHAR(100),
     carrier VARCHAR(100),
     status VARCHAR(50),
-    shipped_at DATETIME,
-    delivered_at DATETIME,
+    shipped_at TIMESTAMP,
+    delivered_at TIMESTAMP,
 
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE
 );
@@ -211,29 +213,29 @@ CREATE TABLE shipping (
 -- ============================================================
 
 CREATE TABLE preorders (
-    preorder_id INT AUTO_INCREMENT PRIMARY KEY,
+    preorder_id SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
     product_id INT NOT NULL,
     quantity INT NOT NULL DEFAULT 1,
     price_at_order DECIMAL(10,2) NOT NULL,
     deposit_ratio DECIMAL(4,2) NOT NULL DEFAULT 0.20,
     deposit_amount DECIMAL(10,2) NOT NULL,
-    deposit_paid_at DATETIME,
+    deposit_paid_at TIMESTAMP,
     status VARCHAR(30) DEFAULT 'requested',
     code VARCHAR(20) NOT NULL UNIQUE,
     contact_email VARCHAR(100) NOT NULL,
     contact_phone VARCHAR(20) NOT NULL,
     expected_arrival DATE,
     note TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(user_id),
     FOREIGN KEY (product_id) REFERENCES products(product_id)
 );
 
 CREATE TABLE preorder_payments (
-    payment_id INT AUTO_INCREMENT PRIMARY KEY,
+    payment_id SERIAL PRIMARY KEY,
     preorder_id INT NOT NULL,
     method VARCHAR(50) DEFAULT 'momo',
     status VARCHAR(20) DEFAULT 'pending',
@@ -243,8 +245,8 @@ CREATE TABLE preorder_payments (
     vnpay_response_code VARCHAR(20),
     pay_url TEXT,
     response_raw TEXT,
-    paid_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (preorder_id) REFERENCES preorders(preorder_id) ON DELETE CASCADE
 );
@@ -254,12 +256,12 @@ CREATE TABLE preorder_payments (
 -- ============================================================
 
 CREATE TABLE reviews (
-    review_id INT AUTO_INCREMENT PRIMARY KEY,
+    review_id SERIAL PRIMARY KEY,
     user_id INT,
     product_id INT,
     rating INT CHECK (rating BETWEEN 1 AND 5),
     comment TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
@@ -279,11 +281,11 @@ CREATE TABLE wishlist (
 -- ============================================================
 
 CREATE TABLE refresh_tokens (
-    token_id INT AUTO_INCREMENT PRIMARY KEY,
+    token_id SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
     token_hash VARCHAR(255) NOT NULL UNIQUE,
-    expires_at DATETIME NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
@@ -293,11 +295,11 @@ CREATE TABLE refresh_tokens (
 -- ============================================================
 
 CREATE TABLE password_reset_tokens (
-    token_id INT AUTO_INCREMENT PRIMARY KEY,
+    token_id SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
     token_hash VARCHAR(255) NOT NULL UNIQUE,
-    expires_at DATETIME NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
@@ -320,6 +322,28 @@ CREATE INDEX idx_news_status ON news_posts(status);
 CREATE INDEX idx_news_created_at ON news_posts(created_at);
 
 -- ============================================================
+-- Triggers
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_news_posts_updated_at
+BEFORE UPDATE ON news_posts
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+CREATE TRIGGER trg_preorders_updated_at
+BEFORE UPDATE ON preorders
+FOR EACH ROW
+EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================
 -- Seed data
 -- ============================================================
 
@@ -329,7 +353,7 @@ INSERT INTO users (username, email, password_hash, full_name, phone, role) VALUE
 ('otaku_hana', 'hana@example.com', '$2b$10$Y6MKD5ZI5gtkvBdYyqwr1.CrHA66ppM/9YNDvacUuqWZSVduKQcIq', 'Nguyen Thu Ha', '0900000002', 'customer');
 
 INSERT INTO addresses (user_id, receiver_name, phone, address_line, city, country, is_default) VALUES
-(2, 'Nguyen Thu Ha', '0900000002', '123 Nguyen Trai, Quan 1', 'TP. Ho Chi Minh', 'Vietnam', 1);
+(2, 'Nguyen Thu Ha', '0900000002', '123 Nguyen Trai, Quan 1', 'TP. Ho Chi Minh', 'Vietnam', TRUE);
 
 INSERT INTO categories (name, parent_id) VALUES
 ('Scale Figure', NULL),
@@ -374,18 +398,18 @@ INSERT INTO products (name, slug, description, price, stock_quantity, status) VA
 ('Naruto Uzumaki - Kurama Link Mode Figure', 'naruto-uzumaki-kurama-link-mode-figure', 'Preorder collector figure with Kurama chakra effect base.', 2990000.00, 0, 'active');
 
 INSERT INTO product_images (product_id, image_url, is_main) VALUES
-(1, 'https://via.placeholder.com/640x640?text=Saber+Figure', 1),
-(2, 'https://via.placeholder.com/640x640?text=Gojo+Figure', 1),
-(3, 'https://via.placeholder.com/640x640?text=Anya+Figure', 1),
-(4, 'https://via.placeholder.com/640x640?text=Zero+Two+Figure', 1),
-(5, 'https://via.placeholder.com/640x640?text=Zoro+Figure', 1),
-(6, 'https://via.placeholder.com/640x640?text=Rem+Figure', 1),
-(7, 'https://via.placeholder.com/640x640?text=Mikasa+Figure', 1),
-(8, 'https://via.placeholder.com/640x640?text=Naruto+Figure', 1),
-(9, 'https://via.placeholder.com/640x640?text=Saber+Alter+Preorder', 1),
-(10, 'https://via.placeholder.com/640x640?text=Gojo+Awakening+Preorder', 1),
-(11, 'https://via.placeholder.com/640x640?text=Eren+Preorder', 1),
-(12, 'https://via.placeholder.com/640x640?text=Naruto+Kurama+Preorder', 1);
+(1, 'https://via.placeholder.com/640x640?text=Saber+Figure', TRUE),
+(2, 'https://via.placeholder.com/640x640?text=Gojo+Figure', TRUE),
+(3, 'https://via.placeholder.com/640x640?text=Anya+Figure', TRUE),
+(4, 'https://via.placeholder.com/640x640?text=Zero+Two+Figure', TRUE),
+(5, 'https://via.placeholder.com/640x640?text=Zoro+Figure', TRUE),
+(6, 'https://via.placeholder.com/640x640?text=Rem+Figure', TRUE),
+(7, 'https://via.placeholder.com/640x640?text=Mikasa+Figure', TRUE),
+(8, 'https://via.placeholder.com/640x640?text=Naruto+Figure', TRUE),
+(9, 'https://via.placeholder.com/640x640?text=Saber+Alter+Preorder', TRUE),
+(10, 'https://via.placeholder.com/640x640?text=Gojo+Awakening+Preorder', TRUE),
+(11, 'https://via.placeholder.com/640x640?text=Eren+Preorder', TRUE),
+(12, 'https://via.placeholder.com/640x640?text=Naruto+Kurama+Preorder', TRUE);
 
 -- product_categories: link products to categories
 INSERT INTO product_categories (product_id, category_id) VALUES

@@ -5,12 +5,15 @@ const notFoundHandler = (req, res) => {
   });
 };
 
-const MYSQL_ERROR_MAP = {
-  ER_DUP_ENTRY: { status: 409, message: "A record with this value already exists." },
-  ER_DATA_TOO_LONG: { status: 400, message: "One or more fields exceed their maximum length." },
-  ER_NO_REFERENCED_ROW_2: { status: 400, message: "Referenced record does not exist." },
-  ER_ROW_IS_REFERENCED_2: { status: 409, message: "Cannot delete — this record is referenced by other data." },
-  ER_BAD_NULL_ERROR: { status: 400, message: "A required field is missing." },
+const POSTGRES_ERROR_MAP = {
+  23505: { status: 409, message: "A record with this value already exists." },
+  22001: {
+    status: 400,
+    message: "One or more fields exceed their maximum length.",
+  },
+  23503: { status: 409, message: "Foreign key constraint violation." },
+  23502: { status: 400, message: "A required field is missing." },
+  "22P02": { status: 400, message: "Invalid input format." },
 };
 
 const errorHandler = (error, _req, res, _next) => {
@@ -22,10 +25,12 @@ const errorHandler = (error, _req, res, _next) => {
     stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
   });
 
-  // Map known MySQL errors to HTTP responses
-  if (error.code && MYSQL_ERROR_MAP[error.code]) {
-    const mapped = MYSQL_ERROR_MAP[error.code];
-    return res.status(mapped.status).json({ message: mapped.message, code: error.code });
+  // Map known PostgreSQL errors to HTTP responses
+  if (error.code && POSTGRES_ERROR_MAP[error.code]) {
+    const mapped = POSTGRES_ERROR_MAP[error.code];
+    return res
+      .status(mapped.status)
+      .json({ message: mapped.message, code: error.code });
   }
 
   const statusCode = error.statusCode || 500;

@@ -9,21 +9,22 @@ const create = async ({
   payUrl,
   responseRaw,
 }) => {
-  const [result] = await pool.execute(
+  const { rows } = await pool.query(
     `
       INSERT INTO preorder_payments
         (preorder_id, method, status, amount, vnpay_txn_ref, pay_url, response_raw)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING payment_id
     `,
     [preorderId, method, status, amount, gatewayTxnRef, payUrl, responseRaw],
   );
 
-  return result.insertId;
+  return rows[0]?.payment_id;
 };
 
 const findByGatewayTxnRef = async (gatewayTxnRef) => {
-  const [rows] = await pool.execute(
-    "SELECT * FROM preorder_payments WHERE vnpay_txn_ref = ?",
+  const { rows } = await pool.query(
+    "SELECT * FROM preorder_payments WHERE vnpay_txn_ref = $1",
     [gatewayTxnRef],
   );
   return rows[0] || null;
@@ -35,30 +36,30 @@ const markPaid = async ({
   responseCode,
   responseRaw,
 }) => {
-  const [result] = await pool.execute(
+  const result = await pool.query(
     `
       UPDATE preorder_payments
-      SET status = 'paid', vnpay_transaction_no = ?, vnpay_response_code = ?,
-          paid_at = NOW(), response_raw = ?
-      WHERE payment_id = ?
+      SET status = 'paid', vnpay_transaction_no = $1, vnpay_response_code = $2,
+          paid_at = NOW(), response_raw = $3
+      WHERE payment_id = $4
     `,
     [transactionNo, responseCode, responseRaw, paymentId],
   );
 
-  return result.affectedRows > 0;
+  return result.rowCount > 0;
 };
 
 const markFailed = async ({ paymentId, responseRaw }) => {
-  const [result] = await pool.execute(
+  const result = await pool.query(
     `
       UPDATE preorder_payments
-      SET status = 'failed', response_raw = ?
-      WHERE payment_id = ?
+      SET status = 'failed', response_raw = $1
+      WHERE payment_id = $2
     `,
     [responseRaw, paymentId],
   );
 
-  return result.affectedRows > 0;
+  return result.rowCount > 0;
 };
 
 module.exports = {

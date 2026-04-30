@@ -15,31 +15,31 @@ const baseSelect = `
 `;
 
 const findAll = async () => {
-  const [rows] = await pool.execute(
+  const { rows } = await pool.query(
     `${baseSelect} ORDER BY created_at DESC, user_id DESC`,
   );
   return rows;
 };
 
 const findById = async (id) => {
-  const [rows] = await pool.execute(`${baseSelect} WHERE user_id = ?`, [id]);
+  const { rows } = await pool.query(`${baseSelect} WHERE user_id = $1`, [id]);
   return rows[0] || null;
 };
 
 const findByEmail = async (email) => {
-  const [rows] = await pool.execute(`${baseSelect} WHERE email = ?`, [email]);
+  const { rows } = await pool.query(`${baseSelect} WHERE email = $1`, [email]);
   return rows[0] || null;
 };
 
 const findByUsername = async (username) => {
-  const [rows] = await pool.execute(`${baseSelect} WHERE username = ?`, [
+  const { rows } = await pool.query(`${baseSelect} WHERE username = $1`, [
     username,
   ]);
   return rows[0] || null;
 };
 
 const findByPhone = async (phone) => {
-  const [rows] = await pool.execute(`${baseSelect} WHERE phone = ?`, [phone]);
+  const { rows } = await pool.query(`${baseSelect} WHERE phone = $1`, [phone]);
   return rows[0] || null;
 };
 
@@ -53,12 +53,13 @@ const create = async (userData) => {
     userData.role || "customer",
   ];
 
-  const [result] = await pool.execute(
-    `INSERT INTO users (${USER_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`,
+  const { rows } = await pool.query(
+    `INSERT INTO users (${USER_COLUMNS}) VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING user_id`,
     values,
   );
 
-  return findById(result.insertId);
+  return rows[0]?.user_id ? findById(rows[0].user_id) : null;
 };
 
 const update = async (id, userData) => {
@@ -77,11 +78,11 @@ const update = async (id, userData) => {
     role: userData.role ?? existingUser.role,
   };
 
-  await pool.execute(
+  await pool.query(
     `
       UPDATE users
-      SET username = ?, email = ?, password_hash = ?, full_name = ?, phone = ?, role = ?
-      WHERE user_id = ?
+      SET username = $1, email = $2, password_hash = $3, full_name = $4, phone = $5, role = $6
+      WHERE user_id = $7
     `,
     [
       payload.username,
@@ -98,10 +99,8 @@ const update = async (id, userData) => {
 };
 
 const deleteUser = async (id) => {
-  const [result] = await pool.execute("DELETE FROM users WHERE user_id = ?", [
-    id,
-  ]);
-  return result.affectedRows > 0;
+  const result = await pool.query("DELETE FROM users WHERE user_id = $1", [id]);
+  return result.rowCount > 0;
 };
 
 module.exports = {
