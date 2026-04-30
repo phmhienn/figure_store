@@ -74,6 +74,32 @@ Cach 2: pgAdmin
 3. Mo `Query Tool` cua database `figure_shop`.
 4. Mo file [database.sql](D:/DocumentByPH/webmohinh/database.sql). Neu pgAdmin bao loi o dong `\connect`, hay xoa 3 dong dau (DROP/CREATE/\connect) truoc khi chay.
 
+### Ket noi Supabase Postgres
+
+1. Vao Supabase Dashboard -> Settings -> Database.
+2. Copy Connection string (Direct connection).
+3. Trong `server/.env`, uu tien dat `DATABASE_URL` va bat SSL:
+
+```env
+DATABASE_URL=postgresql://postgres:YOUR_DB_PASSWORD@db.<project-ref>.supabase.co:5432/postgres
+DB_SSL=true
+DB_SSL_REJECT_UNAUTHORIZED=true
+```
+
+Neu ban muon dung cach thong thuong (khong dung `DATABASE_URL`), su dung cac bien sau (van can SSL):
+
+```env
+DB_HOST=db.<project-ref>.supabase.co
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=YOUR_DB_PASSWORD
+DB_NAME=postgres
+DB_SSL=true
+DB_SSL_REJECT_UNAUTHORIZED=true
+```
+
+Luu y: Supabase SQL Editor khong cho phep `DROP DATABASE` va `CREATE DATABASE`. Khi import [database.sql](D:/DocumentByPH/webmohinh/database.sql) vao Supabase, hay xoa 3 dong dau (DROP/CREATE/\connect) truoc khi chay.
+
 ### Tai khoan mau sau khi import
 
 - Admin: `admin@figureshop.com` / `password`
