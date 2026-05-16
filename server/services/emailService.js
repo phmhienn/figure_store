@@ -101,19 +101,65 @@ const sendPasswordResetOtpEmail = async ({ to, otp, ttlMinutes }) => {
     throw new Error("RESEND_FROM or SMTP_FROM is not configured");
   }
 
-  const subject = "Your password reset code";
-  const text =
-    `We received a request to reset your password.\n\n` +
-    `Your OTP code is: ${otp}\n` +
-    `This code expires in ${ttlMinutes} minutes.\n\n` +
-    `If you did not request this, you can ignore this email.`;
+  const subject = "Reset your KaFigure account password";
+
+  const text = `
+Hello,
+
+We received a request to reset the password for your KaFigure account.
+
+Your verification code is: ${otp}
+
+This code will expire in ${ttlMinutes} minutes.
+
+If you did not request a password reset, you can safely ignore this email.
+
+KaFigure Team
+https://figureshop.qzz.io
+`;
 
   const html = `
-    <p>We received a request to reset your password.</p>
-    <p><strong>Your OTP code is: ${otp}</strong></p>
-    <p>This code expires in ${ttlMinutes} minutes.</p>
-    <p>If you did not request this, you can ignore this email.</p>
-  `;
+<div style="font-family:Arial,sans-serif;line-height:1.6;color:#222;padding:20px">
+  <h2 style="margin-bottom:20px;">KaFigure Password Reset</h2>
+
+  <p>Hello,</p>
+
+  <p>
+    We received a request to reset the password for your
+    <strong>KaFigure</strong> account.
+  </p>
+
+  <p>Please use the verification code below:</p>
+
+  <div
+    style="
+      font-size:32px;
+      font-weight:bold;
+      letter-spacing:4px;
+      margin:24px 0;
+      color:#111;
+    "
+  >
+    ${otp}
+  </div>
+
+  <p>
+    This verification code will expire in
+    <strong>${ttlMinutes} minutes</strong>.
+  </p>
+
+  <p>
+    If you did not request a password reset, you can safely ignore this email.
+  </p>
+
+  <hr style="margin:30px 0;" />
+
+  <p style="font-size:14px;color:#666;">
+    KaFigure Team<br />
+    https://figureshop.qzz.io
+  </p>
+</div>
+`;
 
   await sendEmail({
     from,
